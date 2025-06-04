@@ -8,6 +8,45 @@ const PASS_LOG_SHEET = 'Pass Log';
 const ACTIVE_PASSES_SHEET = 'Active Passes';
 const PERMANENT_RECORD_SHEET = 'Permanent Record';
 
+// Column indexes for each sheet
+const ACTIVE_PASSES = {
+  PASS_ID: 0,
+  STUDENT_ID: 1,
+  ORIGIN_STAFF_ID: 2,
+  CURRENT_STAFF_ID: 3,
+  DESTINATION_ID: 4,
+  LEG_ID: 5,
+  STATE: 6,
+  STATUS: 7,
+  START_TIME: 8
+};
+
+const PASS_LOG = {
+  TIMESTAMP: 0,
+  PASS_ID: 1,
+  LEG_ID: 2,
+  STUDENT_ID: 3,
+  STATE: 4,
+  STATUS: 5,
+  STAFF_ID: 6,
+  DESTINATION_ID: 7,
+  FLAG: 8,
+  NOTES: 9
+};
+
+const PERMANENT_RECORD = {
+  PASS_ID: 0,
+  STUDENT_ID: 1,
+  START_TIME: 2,
+  END_TIME: 3,
+  TOTAL_DURATION: 4,
+  ORIGIN_STAFF_ID: 5,
+  FINAL_DESTINATION: 6,
+  LEG_COUNT: 7,
+  FLAGS: 8,
+  SUMMARY: 9
+};
+
 function getSheet(name) {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
 }
@@ -36,7 +75,7 @@ function openPass(studentID, originStaffID, destinationID, notes) {
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
-    if (data[i][1] === studentID) {
+    if (data[i][ACTIVE_PASSES.STUDENT_ID] === studentID) {
       throw new Error('Student already has an active pass');
     }
   }
@@ -77,7 +116,7 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
   let rowIndex = -1;
   let row;
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === passID) {
+    if (data[i][ACTIVE_PASSES.PASS_ID] === passID) {
       rowIndex = i + 1;
       row = data[i];
       break;
@@ -87,21 +126,21 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
     throw new Error('Pass not found');
   }
 
-  const legID = Number(row[5]) + 1;
+  const legID = Number(row[ACTIVE_PASSES.LEG_ID]) + 1;
   const now = new Date().toISOString();
 
-  row[3] = staffID;
-  row[4] = locationID;
-  row[5] = legID;
-  row[7] = status;
+  row[ACTIVE_PASSES.CURRENT_STAFF_ID] = staffID;
+  row[ACTIVE_PASSES.DESTINATION_ID] = locationID;
+  row[ACTIVE_PASSES.LEG_ID] = legID;
+  row[ACTIVE_PASSES.STATUS] = status;
   sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
 
   appendPassLog({
     timestamp: now,
     passID: passID,
     legID: legID,
-    studentID: row[1],
-    state: row[6],
+    studentID: row[ACTIVE_PASSES.STUDENT_ID],
+    state: row[ACTIVE_PASSES.STATE],
     status: status,
     staffID: staffID,
     destinationID: locationID,
@@ -116,7 +155,7 @@ function closePass(passID, closingStaffID, flag, notes) {
   let rowIndex = -1;
   let row;
   for (let i = 1; i < data.length; i++) {
-    if (data[i][0] === passID) {
+    if (data[i][ACTIVE_PASSES.PASS_ID] === passID) {
       rowIndex = i + 1;
       row = data[i];
       break;
@@ -126,32 +165,32 @@ function closePass(passID, closingStaffID, flag, notes) {
     throw new Error('Pass not found');
   }
   const now = new Date().toISOString();
-  const legID = Number(row[5]) + 1;
+  const legID = Number(row[ACTIVE_PASSES.LEG_ID]) + 1;
 
   appendPassLog({
     timestamp: now,
     passID: passID,
     legID: legID,
-    studentID: row[1],
+    studentID: row[ACTIVE_PASSES.STUDENT_ID],
     state: 'CLOSED',
     status: 'IN',
     staffID: closingStaffID,
-    destinationID: row[4],
+    destinationID: row[ACTIVE_PASSES.DESTINATION_ID],
     flag: flag,
     notes: notes
   });
 
   const recordSheet = getSheet(PERMANENT_RECORD_SHEET);
-  const startTime = row[8];
+  const startTime = row[ACTIVE_PASSES.START_TIME];
   const totalDuration = (new Date(now) - new Date(startTime)) / 60000;
   recordSheet.appendRow([
     passID,
-    row[1],
+    row[ACTIVE_PASSES.STUDENT_ID],
     startTime,
     now,
     totalDuration,
-    row[2],
-    row[4],
+    row[ACTIVE_PASSES.ORIGIN_STAFF_ID],
+    row[ACTIVE_PASSES.DESTINATION_ID],
     legID,
     flag || '',
     notes || ''
