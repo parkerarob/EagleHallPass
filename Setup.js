@@ -11,8 +11,32 @@ function onOpen() {
 }
 
 function setupSystem() {
-  SpreadsheetApp.getActiveSpreadsheet().toast('Setup placeholder');
+  const ss = getSpreadsheet();
+  const requiredSheets = [
+    PASS_LOG_SHEET,
+    ACTIVE_PASSES_SHEET,
+    PERMANENT_RECORD_SHEET,
+    SHEETS.STUDENTS,
+    SHEETS.TEACHERS,
+    SHEETS.SUPPORT,
+    SHEETS.ADMINS,
+    SHEETS.SETTINGS,
+    SHEETS.BELL_SCHEDULE
+  ];
+
+  requiredSheets.forEach(name => {
+    if (!ss.getSheetByName(name)) {
+      ss.insertSheet(name);
+    }
+  });
+
+  if (!getSetting('systemTimezone')) {
+    const settingsSheet = ss.getSheetByName(SHEETS.SETTINGS);
+    settingsSheet.appendRow(['systemTimezone', Session.getScriptTimeZone()]);
+  }
+
   installAutoCloseTriggers();
+  SpreadsheetApp.getActiveSpreadsheet().toast('System setup complete');
 }
 
 function toggleDevMode() {
