@@ -159,3 +159,39 @@ function closePass(passID, closingStaffID, flag, notes) {
 
   sheet.deleteRow(rowIndex);
 }
+
+function autoClosePasses() {
+  const current = getCurrentPeriod();
+  const next = getNextPeriod();
+  Logger.log('Auto-closing passes. Current: ' + (current ? current.period : 'N/A') + ' Next: ' + (next ? next.period : 'N/A'));
+
+  const sheet = getSheet(ACTIVE_PASSES_SHEET);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    const passID = row[0];
+    const status = row[7];
+    const staffID = row[3];
+
+    const staff = getStaffRecordById(staffID);
+
+    if (status === 'OUT') {
+      closePass(passID, staffID, 'autoClose', 'Period change');
+      continue;
+    }
+
+    if (!staff) {
+      closePass(passID, staffID, 'autoClose', 'Period change');
+      continue;
+    }
+
+    if (staff.type === 'support') {
+      const override = String(staff.record.periodOverride).toUpperCase() === 'TRUE';
+      if (!override) {
+        closePass(passID, staffID, 'autoClose', 'Period change');
+      }
+    } else {
+      closePass(passID, staffID, 'autoClose', 'Period change');
+    }
+  }
+}
