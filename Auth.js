@@ -28,3 +28,13 @@ function getEffectiveUser(email) {
   }
   return getUserRecord(email);
 }
+
+function getOrCreateCsrfToken() {
+  const props = PropertiesService.getUserProperties();
+  let token = props.getProperty('csrfToken');
+  if (!token) {
+    token = Utilities.getUuid();
+    props.setProperty('csrfToken', token);
+  }
+  return token;
+}

@@ -22,6 +22,7 @@
     </table>
 
     <script>
+      const CSRF_TOKEN = '<?= csrfToken ?>';
       function renderPasses(passes) {
         var body = document.getElementById('pass-body');
         body.innerHTML = '';
@@ -58,7 +59,8 @@
             action: 'openPass',
             studentID: studentID,
             destinationID: destinationID,
-            notes: ''
+            notes: '',
+            csrfToken: CSRF_TOKEN
           });
       }
 
@@ -69,7 +71,8 @@
             action: 'closePass',
             passID: passID,
             flag: '',
-            notes: ''
+            notes: '',
+            csrfToken: CSRF_TOKEN
           });
       }
 

@@ -28,6 +28,10 @@ function doPost(e) {
   }
   const data = JSON.parse(e.postData.contents || '{}');
   const action = data.action;
+  const token = data.csrfToken;
+  if (token !== getOrCreateCsrfToken()) {
+    return ContentService.createTextOutput('ERROR: Invalid CSRF token');
+  }
 
   try {
     switch (action) {
