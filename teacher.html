@@ -25,6 +25,7 @@
     </table>
 
     <script>
+      const CSRF_TOKEN = '<?= csrfToken ?>';
       function renderStudents(list) {
         var tbody = document.getElementById('student-table').querySelector('tbody');
         tbody.innerHTML = '';
@@ -42,7 +43,8 @@
               action: 'openPass',
               studentID: s.studentID,
               destinationID: dest,
-              notes: ''
+              notes: '',
+              csrfToken: CSRF_TOKEN
             };
             google.script.run.withSuccessHandler(fetchActivePasses)
               .doPost({ postData: { contents: JSON.stringify(body) } });
@@ -69,7 +71,7 @@
           var closeBtn = document.createElement('button');
           closeBtn.textContent = 'Close Pass';
           closeBtn.onclick = function() {
-            var body = { action: 'closePass', passID: p.passID };
+            var body = { action: 'closePass', passID: p.passID, csrfToken: CSRF_TOKEN };
             google.script.run.withSuccessHandler(fetchActivePasses)
               .doPost({ postData: { contents: JSON.stringify(body) } });
           };

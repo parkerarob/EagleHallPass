@@ -16,6 +16,7 @@
     </div>
 
     <script>
+      const CSRF_TOKEN = '<?= csrfToken ?>';
       function updateEmergencyStatus(isOn) {
         var text = document.getElementById('emergency-status-text');
         text.textContent = isOn ? 'ON' : 'OFF';

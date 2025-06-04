@@ -6,5 +6,6 @@ function renderStudentDashboard(student) {
   }
   const template = HtmlService.createTemplateFromFile('student');
   template.student = student;
+  template.csrfToken = getOrCreateCsrfToken();
   return template.evaluate().setTitle('Eagle Hall Pass - Student');
 }

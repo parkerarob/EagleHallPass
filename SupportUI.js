@@ -6,6 +6,7 @@ function renderSupportDashboard(support) {
   }
   const template = HtmlService.createTemplateFromFile('support');
   template.support = support;
+  template.csrfToken = getOrCreateCsrfToken();
   return template.evaluate().setTitle('Eagle Hall Pass - Support');
 }
 

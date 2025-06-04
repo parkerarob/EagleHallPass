@@ -10,6 +10,7 @@
     <div id="pass-state">Current Pass: <span id="pass-state-text">Loading...</span></div>
 
     <script>
+      const CSRF_TOKEN = '<?= csrfToken ?>';
       function updatePassState(pass) {
         var text = document.getElementById('pass-state-text');
         if (!pass) {
