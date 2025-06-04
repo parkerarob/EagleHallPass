@@ -4,7 +4,6 @@
 
 const CACHE_KEY_PREFIX = 'EHP_CACHE_';
 const CACHE_EXPIRATION_MINUTES = 5;
-const ACTIVE_PASSES_SHEET = 'Active Passes';
 
 const SHEETS = {
   STUDENTS: 'Student Data',
