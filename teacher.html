@@ -7,5 +7,94 @@
   <body>
     <h1>Teacher Dashboard</h1>
     <p>Welcome, <?= teacher.firstName ?> <?= teacher.lastName ?>.</p>
+
+    <h2>Current Class</h2>
+    <table id="student-table" border="1">
+      <thead>
+        <tr><th>Student</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <h2>Active Passes</h2>
+    <table id="active-table" border="1">
+      <thead>
+        <tr><th>Student</th><th>Status</th><th>Destination</th><th>Action</th></tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+
+    <script>
+      function renderStudents(list) {
+        var tbody = document.getElementById('student-table').querySelector('tbody');
+        tbody.innerHTML = '';
+        list.forEach(function(s) {
+          var tr = document.createElement('tr');
+          var nameTd = document.createElement('td');
+          nameTd.textContent = s.firstName + ' ' + s.lastName;
+          var actionTd = document.createElement('td');
+          var btn = document.createElement('button');
+          btn.textContent = 'Open Pass';
+          btn.onclick = function() {
+            var dest = prompt('Destination ID');
+            if (!dest) return;
+            var body = {
+              action: 'openPass',
+              studentID: s.studentID,
+              destinationID: dest,
+              notes: ''
+            };
+            google.script.run.withSuccessHandler(fetchActivePasses)
+              .doPost({ postData: { contents: JSON.stringify(body) } });
+          };
+          actionTd.appendChild(btn);
+          tr.appendChild(nameTd);
+          tr.appendChild(actionTd);
+          tbody.appendChild(tr);
+        });
+      }
+
+      function renderActivePasses(list) {
+        var tbody = document.getElementById('active-table').querySelector('tbody');
+        tbody.innerHTML = '';
+        list.forEach(function(p) {
+          var tr = document.createElement('tr');
+          var studentTd = document.createElement('td');
+          studentTd.textContent = p.studentName;
+          var statusTd = document.createElement('td');
+          statusTd.textContent = p.status;
+          var destTd = document.createElement('td');
+          destTd.textContent = p.destinationID;
+          var actionTd = document.createElement('td');
+          var closeBtn = document.createElement('button');
+          closeBtn.textContent = 'Close Pass';
+          closeBtn.onclick = function() {
+            var body = { action: 'closePass', passID: p.passID };
+            google.script.run.withSuccessHandler(fetchActivePasses)
+              .doPost({ postData: { contents: JSON.stringify(body) } });
+          };
+          actionTd.appendChild(closeBtn);
+          tr.appendChild(studentTd);
+          tr.appendChild(statusTd);
+          tr.appendChild(destTd);
+          tr.appendChild(actionTd);
+          tbody.appendChild(tr);
+        });
+      }
+
+      function fetchStudents() {
+        google.script.run.withSuccessHandler(renderStudents)
+          .getStudentsForTeacherCurrentPeriod('<?= teacher.staffID ?>');
+      }
+
+      function fetchActivePasses() {
+        google.script.run.withSuccessHandler(renderActivePasses)
+          .getActivePassesForTeacher('<?= teacher.staffID ?>');
+      }
+
+      fetchStudents();
+      fetchActivePasses();
+      setInterval(fetchActivePasses, 30000);
+    </script>
   </body>
 </html>
