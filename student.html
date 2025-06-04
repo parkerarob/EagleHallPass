@@ -7,5 +7,25 @@
   <body>
     <h1>Student Dashboard</h1>
     <p>Welcome, <?= student.firstName ?> <?= student.lastName ?>.</p>
+    <div id="pass-state">Current Pass: <span id="pass-state-text">Loading...</span></div>
+
+    <script>
+      function updatePassState(pass) {
+        var text = document.getElementById('pass-state-text');
+        if (!pass) {
+          text.textContent = 'No pass';
+          return;
+        }
+        text.textContent = pass.status === 'OUT' ? 'Pass OUT' : 'Pass IN';
+      }
+
+      function fetchPassState() {
+        google.script.run.withSuccessHandler(updatePassState)
+          .getCurrentStudentPass('<?= student.studentID ?>');
+      }
+
+      fetchPassState();
+      setInterval(fetchPassState, 30000);
+    </script>
   </body>
 </html>

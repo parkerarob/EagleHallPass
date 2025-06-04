@@ -37,6 +37,26 @@ function generatePassId() {
   return Utilities.getUuid();
 }
 
+function getCurrentStudentPass(studentID) {
+  const sheet = getSheet(ACTIVE_PASSES_SHEET);
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (String(row[1]) === String(studentID)) {
+      return {
+        passID: row[0],
+        studentID: row[1],
+        staffID: row[3],
+        destinationID: row[4],
+        state: row[6],
+        status: row[7],
+        startTime: row[8]
+      };
+    }
+  }
+  return null;
+}
+
 function openPass(studentID, originStaffID, destinationID, notes) {
   // Prevent pass changes if emergency mode is enabled
   if (getSetting('emergencyMode') === 'TRUE') {
