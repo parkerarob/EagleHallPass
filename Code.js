@@ -12,6 +12,20 @@ function getSheet(name) {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
 }
 
+// Basic input validation helpers
+function sanitizeId(id) {
+  id = String(id || '').trim();
+  if (!/^[\w-]+$/.test(id)) {
+    throw new Error('Invalid characters in ID');
+  }
+  return id;
+}
+
+function sanitizeText(text) {
+  text = String(text || '').replace(/[<>]/g, '').trim();
+  return text;
+}
+
 function appendPassLog(entry) {
   const sheet = getSheet(PASS_LOG_SHEET);
   sheet.appendRow([
@@ -33,6 +47,10 @@ function generatePassId() {
 }
 
 function openPass(studentID, originStaffID, destinationID, notes) {
+  studentID = sanitizeId(studentID);
+  originStaffID = sanitizeId(originStaffID);
+  destinationID = sanitizeId(destinationID);
+  notes = sanitizeText(notes);
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
@@ -72,6 +90,12 @@ function openPass(studentID, originStaffID, destinationID, notes) {
 }
 
 function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
+  passID = sanitizeId(passID);
+  status = sanitizeText(status);
+  locationID = sanitizeId(locationID);
+  staffID = sanitizeId(staffID);
+  flag = flag ? sanitizeId(flag) : '';
+  notes = sanitizeText(notes);
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
   let rowIndex = -1;
@@ -111,6 +135,10 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
 }
 
 function closePass(passID, closingStaffID, flag, notes) {
+  passID = sanitizeId(passID);
+  closingStaffID = sanitizeId(closingStaffID);
+  flag = flag ? sanitizeId(flag) : '';
+  notes = sanitizeText(notes);
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
   let rowIndex = -1;

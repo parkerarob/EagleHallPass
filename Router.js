@@ -20,7 +20,28 @@ function doGet(e) {
   }
 }
 
+function verifyXsrfToken(token) {
+  const stored = PropertiesService.getScriptProperties().getProperty('XSRF_TOKEN');
+  return token && token === stored;
+}
+
 function doPost(e) {
-  // Placeholder for POST actions
-  return doGet(e);
+  const params = e && e.parameter ? e.parameter : {};
+  if (!verifyXsrfToken(params.token)) {
+    return HtmlService.createHtmlOutput('Invalid or missing token');
+  }
+
+  switch (params.action) {
+    case 'openPass':
+      const passId = openPass(params.studentID, params.originStaffID, params.destinationID, params.notes);
+      return ContentService.createTextOutput(passId);
+    case 'updatePass':
+      updatePassStatus(params.passID, params.status, params.locationID, params.staffID, params.flag, params.notes);
+      return ContentService.createTextOutput('OK');
+    case 'closePass':
+      closePass(params.passID, params.closingStaffID, params.flag, params.notes);
+      return ContentService.createTextOutput('OK');
+    default:
+      return HtmlService.createHtmlOutput('Unknown action');
+  }
 }
