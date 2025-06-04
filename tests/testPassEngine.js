@@ -68,15 +68,24 @@ function test_openPass_createsRow() {
   const sheet = SpreadsheetApp.getActive().getSheetByName('Active Passes');
   const data = sheet.getDataRange().getValues();
   const row = data.find(r => r[0] === passID);
-
-  const ok1 = assertEquals(ids.student, row[1], 'openPass → studentID stored');
-  const ok2 = assertEquals('OPEN',       row[6], 'openPass → state OPEN');
-  const ok3 = assertEquals('OUT',        row[7], 'openPass → status OUT');
+  const ok0 = assertEquals(true, !!row, 'openPass → row exists');
+  const ok1 = assertEquals(passID,       row[0], 'openPass → passID');
+  const ok2 = assertEquals(ids.student,  row[1], 'openPass → studentID');
+  const ok3 = assertEquals(ids.staffA,   row[2], 'openPass → originStaffID');
+  const ok4 = assertEquals('',           row[3], 'openPass → staffID empty');
+  const ok5 = assertEquals(ids.dest1,    row[4], 'openPass → destinationID');
+  const ok6 = assertEquals(1,            row[5], 'openPass → legID 1');
+  const ok7 = assertEquals('OPEN',       row[6], 'openPass → state OPEN');
+  const ok8 = assertEquals('OUT',        row[7], 'openPass → status OUT');
+  const ok9 = assertEquals(true,         typeof row[8] === 'number',
+                           'openPass → startTime number');
 
   // clean-up
   deleteRowsByPassId('Active Passes', passID);
   purgeLogs(passID);
-  return ok1 && ok2 && ok3;
+  return (
+    ok0 && ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9
+  );
 }
 
 function test_openPass_duplicateFails() {
@@ -113,10 +122,37 @@ function test_updatePassStatus_restroomInvalid() {
   const ok = assertThrows(() =>
       updatePassStatus(passID, 'IN', ids.dest2, ids.staffB, '', ''),
       'Restroom pass cannot be IN');
-  // clean-up
   deleteRowsByPassId('Active Passes', passID);
   purgeLogs(passID);
-  return ok;
+
+  const passID2 = openPass(ids.student, ids.staffA, ids.dest1, 'media-pass');
+  updatePassStatus(passID2, 'IN', ids.dest1, ids.staffB, '', '');
+  const row = SpreadsheetApp.getActive()
+    .getSheetByName('Active Passes')
+    .getDataRange()
+    .getValues()
+    .find(r => r[0] === passID2);
+  const ok2 = assertEquals('IN', row[7], 'Media pass can go IN');
+
+  deleteRowsByPassId('Active Passes', passID2);
+  purgeLogs(passID2);
+
+  return ok && ok2;
+}
+
+function test_getCurrentStudentPass_returnsRow() {
+  const ids = _makeTestIds();
+  const passID = openPass(ids.student, ids.staffA, ids.dest1, 'getCurrent');
+
+  const first = getCurrentStudentPass(ids.student);
+  const ok1 = assertEquals(true, first !== null, 'getCurrentStudentPass → not null');
+
+  closePass(passID, ids.staffB, '', 'close for test');
+  const second = getCurrentStudentPass(ids.student);
+  const ok2 = assertEquals(null, second, 'getCurrentStudentPass → null after close');
+
+  purgeLogs(passID);
+  return ok1 && ok2;
 }
 
 function test_closePass_removesRow() {
@@ -142,14 +178,15 @@ function test_autoClosePasses_closes() {
   // quick monkey-patch – current period is null, next period not null
   const origGetCurrent = this.getCurrentPeriod;
   const origGetNext    = this.getNextPeriod;
-  this.getCurrentPeriod = () => ({ period: '1' });
-  this.getNextPeriod    = () => ({ period: '2' });
+  try {
+    this.getCurrentPeriod = () => ({ period: '1' });
+    this.getNextPeriod    = () => ({ period: '2' });
 
-  autoClosePasses();
-
-  // restore
-  this.getCurrentPeriod = origGetCurrent;
-  this.getNextPeriod    = origGetNext;
+    autoClosePasses();
+  } finally {
+    this.getCurrentPeriod = origGetCurrent;
+    this.getNextPeriod    = origGetNext;
+  }
 
   const sheet = SpreadsheetApp.getActive().getSheetByName('Active Passes');
   const exists = sheet.getDataRange().getValues().some(r => r[0] === passID);
@@ -167,6 +204,7 @@ function runAllTests() {
     test_openPass_duplicateFails(),
     test_updatePassStatus_inToLocation(),
     test_updatePassStatus_restroomInvalid(),
+    test_getCurrentStudentPass_returnsRow(),
     test_closePass_removesRow(),
     test_autoClosePasses_closes()
   ];
