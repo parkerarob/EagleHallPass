@@ -93,7 +93,8 @@ function openPass(studentID, originStaffID, destinationID, notes) {
     }
 
     const passID = generatePassId();
-    const now = new Date().toISOString();
+    const now = new Date();
+    const nowIso = now.toISOString();
     const row = [
       passID,
       studentID,
@@ -108,7 +109,7 @@ function openPass(studentID, originStaffID, destinationID, notes) {
     sheet.appendRow(row);
 
     appendPassLog({
-      timestamp: now,
+      timestamp: nowIso,
       passID: passID,
       legID: 1,
       studentID: studentID,
