@@ -8,3 +8,12 @@ function renderSupportDashboard(support) {
   template.support = support;
   return template.evaluate().setTitle('Eagle Hall Pass - Support');
 }
+
+function listActivePasses() {
+  return getAllActivePasses();
+}
+
+function supportAction(data) {
+  const res = doPost({ postData: { contents: JSON.stringify(data) } });
+  return res.getContent();
+}

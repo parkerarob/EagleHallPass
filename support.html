@@ -7,5 +7,74 @@
   <body>
     <h1>Support Dashboard</h1>
     <p>Welcome, <?= support.firstName ?> <?= support.lastName ?>.</p>
+    <button onclick="openPass()">Open Pass</button>
+
+    <table id="active-passes" border="1">
+      <thead>
+        <tr>
+          <th>Student ID</th>
+          <th>Status</th>
+          <th>Destination</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody id="pass-body"></tbody>
+    </table>
+
+    <script>
+      function renderPasses(passes) {
+        var body = document.getElementById('pass-body');
+        body.innerHTML = '';
+        passes.forEach(function(p) {
+          var tr = document.createElement('tr');
+          var btn =
+            '<button onclick="closePass(\'' + p.passID + '\')">Close</button>';
+          tr.innerHTML =
+            '<td>' +
+            p.studentID +
+            '</td><td>' +
+            p.status +
+            '</td><td>' +
+            p.destinationID +
+            '</td><td>' +
+            btn +
+            '</td>';
+          body.appendChild(tr);
+        });
+      }
+
+      function fetchPasses() {
+        google.script.run.withSuccessHandler(renderPasses).listActivePasses();
+      }
+
+      function openPass() {
+        var studentID = prompt('Student ID');
+        if (!studentID) return;
+        var destinationID = prompt('Destination ID');
+        if (!destinationID) return;
+        google.script.run
+          .withSuccessHandler(fetchPasses)
+          .supportAction({
+            action: 'openPass',
+            studentID: studentID,
+            destinationID: destinationID,
+            notes: ''
+          });
+      }
+
+      function closePass(passID) {
+        google.script.run
+          .withSuccessHandler(fetchPasses)
+          .supportAction({
+            action: 'closePass',
+            passID: passID,
+            flag: '',
+            notes: ''
+          });
+      }
+
+      fetchPasses();
+      setInterval(fetchPasses, 60000);
+    </script>
   </body>
 </html>
