@@ -8,6 +8,11 @@ const PASS_LOG_SHEET = 'Pass Log';
 const ACTIVE_PASSES_SHEET = 'Active Passes';
 const PERMANENT_RECORD_SHEET = 'Permanent Record';
 
+function getLongDurationThreshold() {
+  const val = getSetting('longDurationThreshold');
+  return val ? Number(val) : null;
+}
+
 function getSheet(name) {
   return SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
 }
@@ -113,6 +118,13 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
 
   const legID = Number(row[5]) + 1;
   const now = new Date().toISOString();
+  const startTime = row[8];
+  const elapsed = (new Date(now) - new Date(startTime)) / 60000;
+  const threshold = getLongDurationThreshold();
+  let finalFlag = flag;
+  if (threshold && elapsed > threshold) {
+    finalFlag = finalFlag ? finalFlag + ' LD' : 'LD';
+  }
 
   row[3] = staffID;
   row[4] = locationID;
@@ -129,7 +141,7 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
     status: status,
     staffID: staffID,
     destinationID: locationID,
-    flag: flag,
+    flag: finalFlag,
     notes: notes
   });
 }
@@ -155,6 +167,13 @@ function closePass(passID, closingStaffID, flag, notes) {
   }
   const now = new Date().toISOString();
   const legID = Number(row[5]) + 1;
+  const startTime = row[8];
+  const totalDuration = (new Date(now) - new Date(startTime)) / 60000;
+  const threshold = getLongDurationThreshold();
+  let finalFlag = flag;
+  if (threshold && totalDuration > threshold) {
+    finalFlag = finalFlag ? finalFlag + ' LD' : 'LD';
+  }
 
   appendPassLog({
     timestamp: now,
@@ -165,13 +184,11 @@ function closePass(passID, closingStaffID, flag, notes) {
     status: 'IN',
     staffID: closingStaffID,
     destinationID: row[4],
-    flag: flag,
+    flag: finalFlag,
     notes: notes
   });
 
   const recordSheet = getSheet(PERMANENT_RECORD_SHEET);
-  const startTime = row[8];
-  const totalDuration = (new Date(now) - new Date(startTime)) / 60000;
   recordSheet.appendRow([
     passID,
     row[1],
@@ -181,7 +198,7 @@ function closePass(passID, closingStaffID, flag, notes) {
     row[2],
     row[4],
     legID,
-    flag || '',
+    finalFlag || '',
     notes || ''
   ]);
 
