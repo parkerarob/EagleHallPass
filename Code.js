@@ -87,6 +87,22 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
     throw new Error('Pass not found');
   }
 
+  const currentDestination = String(row[4]).toUpperCase();
+  if (
+    currentDestination === 'RESTROOM' &&
+    (status === 'IN' || locationID !== row[4])
+  ) {
+    Logger.log(
+      'Invalid update attempt on restroom pass ' +
+        passID +
+        ': status=' +
+        status +
+        ', destinationID=' +
+        locationID
+    );
+    return;
+  }
+
   const legID = Number(row[5]) + 1;
   const now = new Date().toISOString();
 
