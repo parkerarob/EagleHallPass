@@ -32,11 +32,11 @@ function assertThrows(fn, msg) {
 ////////////////////  UTILITIES  ////////////////////
 
 function _makeTestIds() {
-  const ts = Date.now();
+  const uid = Utilities.getUuid();          // guaranteed unique
   return {
-    student: 'TEST_STU_' + ts,
-    staffA:  'TEST_STF_A_' + ts,
-    staffB:  'TEST_STF_B_' + ts,
+    student: 'TEST_STU_' + uid,
+    staffA:  'TEST_STF_A_' + uid,
+    staffB:  'TEST_STF_B_' + uid,
     dest1:   'MEDIA',
     dest2:   'RESTROOM'
   };
@@ -72,13 +72,14 @@ function test_openPass_createsRow() {
     const ok1 = assertEquals(passID,       row[0], 'openPass → passID');
     const ok2 = assertEquals(ids.student,  row[1], 'openPass → studentID');
     const ok3 = assertEquals(ids.staffA,   row[2], 'openPass → originStaffID');
-    const ok4 = assertEquals('',           row[3], 'openPass → staffID empty');
+    // Spec decision:
+    // If originStaffID should duplicate into staffID at creation, use this:
+    const ok4 = assertEquals(ids.staffA, row[3], 'openPass → staffID = origin at open');
     const ok5 = assertEquals(ids.dest1,    row[4], 'openPass → destinationID');
     const ok6 = assertEquals(1,            row[5], 'openPass → legID 1');
     const ok7 = assertEquals('OPEN',       row[6], 'openPass → state OPEN');
     const ok8 = assertEquals('OUT',        row[7], 'openPass → status OUT');
-    const ok9 = assertEquals(true,         row[8] > 0,
-                             'openPass → startTime positive number');
+    const ok9 = assertEquals(true, row[8] instanceof Date, 'openPass → startTime is Date');
     return (
       ok0 && ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9
     );
