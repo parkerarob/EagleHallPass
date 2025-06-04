@@ -68,6 +68,11 @@ function getStudentByEmail(email) {
   return findByEmail(SHEETS.STUDENTS, email);
 }
 
+function getStudentById(id) {
+  const data = getData(SHEETS.STUDENTS);
+  return data.find(r => String(r.studentID) === String(id));
+}
+
 function getTeacherByEmail(email) {
   return findByEmail(SHEETS.TEACHERS, email);
 }

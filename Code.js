@@ -260,3 +260,19 @@ function autoClosePasses() {
     }
   }
 }
+
+function getOutStudents() {
+  const sheet = getSheet(ACTIVE_PASSES_SHEET);
+  const data = sheet.getDataRange().getValues();
+  const out = [];
+  for (let i = 1; i < data.length; i++) {
+    const row = data[i];
+    if (row[7] === 'OUT') {
+      const student = getStudentById(row[1]);
+      if (student) {
+        out.push(student);
+      }
+    }
+  }
+  return out;
+}
