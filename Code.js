@@ -33,6 +33,10 @@ function generatePassId() {
 }
 
 function openPass(studentID, originStaffID, destinationID, notes) {
+  // Prevent pass changes if emergency mode is enabled
+  if (getSetting('emergencyMode') === 'TRUE') {
+    throw new Error('System is in emergency mode. Passes cannot be modified');
+  }
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
@@ -72,6 +76,10 @@ function openPass(studentID, originStaffID, destinationID, notes) {
 }
 
 function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
+  // Prevent pass changes if emergency mode is enabled
+  if (getSetting('emergencyMode') === 'TRUE') {
+    throw new Error('System is in emergency mode. Passes cannot be modified');
+  }
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
   let rowIndex = -1;
@@ -111,6 +119,10 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
 }
 
 function closePass(passID, closingStaffID, flag, notes) {
+  // Prevent pass changes if emergency mode is enabled
+  if (getSetting('emergencyMode') === 'TRUE') {
+    throw new Error('System is in emergency mode. Passes cannot be modified');
+  }
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
   let rowIndex = -1;
