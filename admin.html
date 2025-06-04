@@ -9,6 +9,7 @@
     <p>Welcome, <?= admin.firstName ?> <?= admin.lastName ?>.</p>
     <div id="emergency-status">Emergency Mode: <span id="emergency-status-text">Loading...</span></div>
     <button onclick="toggleEmergency()">Toggle Emergency Mode</button>
+    <button onclick="testAutoClose()">Test Auto Close</button>
 
     <div id="out-students" style="display:none;">
       <h3>Students Currently OUT</h3>
@@ -45,6 +46,12 @@
 
       function toggleEmergency() {
         google.script.run.withSuccessHandler(fetchEmergencyStatus).toggleEmergencyMode();
+      }
+
+      function testAutoClose() {
+        google.script.run.withSuccessHandler(function() {
+          alert('Auto-close routine executed.');
+        }).autoClosePasses();
       }
 
       fetchEmergencyStatus();
