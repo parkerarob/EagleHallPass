@@ -8,13 +8,17 @@
     <h1>Admin Dashboard</h1>
     <p>Welcome, <?= admin.firstName ?> <?= admin.lastName ?>.</p>
     <div id="emergency-status">Emergency Mode: <span id="emergency-status-text">Loading...</span></div>
-    <button onclick="toggleEmergency()">Toggle Emergency Mode</button>
-    <button onclick="testAutoClose()">Test Auto Close</button>
+      <button onclick="toggleEmergency()">Toggle Emergency Mode</button>
+      <button onclick="testAutoClose()">Test Auto Close</button>
+      <button onclick="clearCache()">Force Clear Cache</button>
 
-    <div id="out-students" style="display:none;">
-      <h3>Students Currently OUT</h3>
-      <ul id="out-students-list"></ul>
-    </div>
+      <div id="out-students" style="display:none;">
+        <h3>Students Currently OUT</h3>
+        <ul id="out-students-list"></ul>
+      </div>
+
+      <h3>Who Am I?</h3>
+      <div id="whoami"></div>
 
     <script>
       const CSRF_TOKEN = '<?= csrfToken ?>';
@@ -48,13 +52,29 @@
         google.script.run.withSuccessHandler(fetchEmergencyStatus).toggleEmergencyMode();
       }
 
-      function testAutoClose() {
-        google.script.run.withSuccessHandler(function() {
-          alert('Auto-close routine executed.');
-        }).autoClosePasses();
-      }
+        function testAutoClose() {
+          google.script.run.withSuccessHandler(function() {
+            alert('Auto-close routine executed.');
+          }).autoClosePasses();
+        }
 
-      fetchEmergencyStatus();
-    </script>
+        function clearCache() {
+          google.script.run.withSuccessHandler(function(msg) {
+            alert(msg);
+          }).clearSystemCache();
+        }
+
+        function fetchWhoAmI() {
+          google.script.run.withSuccessHandler(function(res) {
+            document.getElementById('whoami').innerHTML =
+              '<b>Email:</b> ' + res.email + '<br>' +
+              '<b>Role:</b> ' + res.role + '<br>' +
+              '<b>Source:</b> ' + res.source;
+          }).whoAmI();
+        }
+
+        fetchEmergencyStatus();
+        fetchWhoAmI();
+      </script>
   </body>
 </html>
