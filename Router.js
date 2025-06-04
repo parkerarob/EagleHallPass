@@ -21,6 +21,33 @@ function doGet(e) {
 }
 
 function doPost(e) {
-  // Placeholder for POST actions
-  return doGet(e);
+  const email = getCurrentUserEmail();
+  const user = getEffectiveUser(email);
+  if (!user || !e.postData) {
+    return HtmlService.createHtmlOutput('Invalid request');
+  }
+  const data = JSON.parse(e.postData.contents || '{}');
+  const action = data.action;
+
+  try {
+    switch (action) {
+      case 'openPass':
+        if (user.role !== 'teacher' && user.role !== 'support') {
+          throw new Error('Unauthorized');
+        }
+        openPass(data.studentID, user.record.staffID, data.destinationID, data.notes);
+        break;
+      case 'updatePassStatus':
+        updatePassStatus(data.passID, data.status, data.locationID, user.record.staffID, data.flag, data.notes);
+        break;
+      case 'closePass':
+        closePass(data.passID, user.record.staffID, data.flag, data.notes);
+        break;
+      default:
+        throw new Error('Unknown action');
+    }
+    return ContentService.createTextOutput('OK');
+  } catch (err) {
+    return ContentService.createTextOutput('ERROR: ' + err.message);
+  }
 }
