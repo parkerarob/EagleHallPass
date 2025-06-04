@@ -67,6 +67,10 @@ function toggleEmergencyMode() {
   SpreadsheetApp.getActiveSpreadsheet().toast('Emergency mode: ' + newVal);
 }
 
+function getEmergencyMode() {
+  return getSetting('emergencyMode') === 'TRUE';
+}
+
 function installAutoCloseTriggers() {
   const tz = getSetting('systemTimezone') || Session.getScriptTimeZone();
   const dayType = getSetting('dayType');

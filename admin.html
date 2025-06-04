@@ -7,5 +7,46 @@
   <body>
     <h1>Admin Dashboard</h1>
     <p>Welcome, <?= admin.firstName ?> <?= admin.lastName ?>.</p>
+    <div id="emergency-status">Emergency Mode: <span id="emergency-status-text">Loading...</span></div>
+    <button onclick="toggleEmergency()">Toggle Emergency Mode</button>
+
+    <div id="out-students" style="display:none;">
+      <h3>Students Currently OUT</h3>
+      <ul id="out-students-list"></ul>
+    </div>
+
+    <script>
+      function updateEmergencyStatus(isOn) {
+        var text = document.getElementById('emergency-status-text');
+        text.textContent = isOn ? 'ON' : 'OFF';
+        var section = document.getElementById('out-students');
+        if (isOn) {
+          section.style.display = 'block';
+          google.script.run.withSuccessHandler(renderOutStudents).getOutStudents();
+        } else {
+          section.style.display = 'none';
+        }
+      }
+
+      function renderOutStudents(list) {
+        var ul = document.getElementById('out-students-list');
+        ul.innerHTML = '';
+        list.forEach(function(s) {
+          var li = document.createElement('li');
+          li.textContent = s.firstName + ' ' + s.lastName;
+          ul.appendChild(li);
+        });
+      }
+
+      function fetchEmergencyStatus() {
+        google.script.run.withSuccessHandler(updateEmergencyStatus).getEmergencyMode();
+      }
+
+      function toggleEmergency() {
+        google.script.run.withSuccessHandler(fetchEmergencyStatus).toggleEmergencyMode();
+      }
+
+      fetchEmergencyStatus();
+    </script>
   </body>
 </html>
