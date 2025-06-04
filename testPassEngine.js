@@ -32,7 +32,7 @@ function assertThrows(fn, msg) {
 ////////////////////  UTILITIES  ////////////////////
 
 function _makeTestIds() {
-  const uid = Utilities.getUuid();          // guaranteed unique
+  const uid = Utilities.getUuid() + '_' + Date.now();
   return {
     student: 'TEST_STU_' + uid,
     staffA:  'TEST_STF_A_' + uid,
@@ -84,7 +84,7 @@ function test_openPass_createsRow() {
       ok0 && ok1 && ok2 && ok3 && ok4 && ok5 && ok6 && ok7 && ok8 && ok9
     );
   } finally {
-    deleteRowsByPassId('Active Passes', passID);
+    closePass(passID, ids.staffA, '', 'tearDown');
     purgeLogs(passID);
   }
 }
@@ -98,7 +98,7 @@ function test_openPass_duplicateFails() {
         'openPass duplicate should throw');
     return ok;
   } finally {
-    deleteRowsByPassId('Active Passes', passID);
+    closePass(passID, ids.staffA, '', 'tearDown');
     purgeLogs(passID);
   }
 }
@@ -116,7 +116,7 @@ function test_updatePassStatus_inToLocation() {
     const ok2 = assertEquals('IN',       row[7], 'updatePassStatus → status IN');
     return ok1 && ok2;
   } finally {
-    deleteRowsByPassId('Active Passes', passID);
+    closePass(passID, ids.staffA, '', 'tearDown');
     purgeLogs(passID);
   }
 }
@@ -138,8 +138,8 @@ function test_updatePassStatus_restroomInvalid() {
     const ok2 = assertEquals('IN', row[7], 'Media pass can go IN');
     return ok && ok2;
   } finally {
-    deleteRowsByPassId('Active Passes', passID);
-    deleteRowsByPassId('Active Passes', passID2);
+    closePass(passID, ids.staffA, '', 'tearDown');
+    closePass(passID2, ids.staffA, '', 'tearDown');
     purgeLogs(passID);
     purgeLogs(passID2);
   }
@@ -224,7 +224,7 @@ function test_legId_increments() {
     const ok2 = assertEquals(3, row[5], 'legID increments');
     return ok1 && ok2;
   } finally {
-    deleteRowsByPassId('Active Passes', passID);
+    closePass(passID, ids.staffA, '', 'tearDown');
     purgeLogs(passID);
   }
 }
