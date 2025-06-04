@@ -4,6 +4,7 @@
 
 const CACHE_KEY_PREFIX = 'EHP_CACHE_';
 const CACHE_EXPIRATION_MINUTES = 5;
+const ACTIVE_PASSES_SHEET = 'Active Passes';
 
 const SHEETS = {
   STUDENTS: 'Student Data',
@@ -139,4 +140,38 @@ function getNextPeriod() {
     }
   }
   return null;
+}
+
+function getStudentsForTeacherCurrentPeriod(staffID) {
+  const current = getCurrentPeriod();
+  if (!current) return [];
+  const period = current.period;
+  const students = getData(SHEETS.STUDENTS);
+  return students.filter(s => String(s[period]) === String(staffID));
+}
+
+function getActivePassesForTeacher(staffID) {
+  const classStudents = getStudentsForTeacherCurrentPeriod(staffID);
+  const ids = classStudents.map(s => String(s.studentID));
+  if (ids.length === 0) return [];
+  const sheet = getSpreadsheet().getSheetByName(ACTIVE_PASSES_SHEET);
+  if (!sheet) return [];
+  const rows = sheet.getDataRange().getValues();
+  rows.shift();
+  return rows
+    .filter(r => ids.includes(String(r[1])))
+    .map(r => {
+      const student = classStudents.find(s => String(s.studentID) === String(r[1]));
+      return {
+        passID: r[0],
+        studentID: r[1],
+        staffID: r[3],
+        destinationID: r[4],
+        legID: r[5],
+        state: r[6],
+        status: r[7],
+        startTime: r[8],
+        studentName: student ? student.firstName + ' ' + student.lastName : ''
+      };
+    });
 }
