@@ -9,3 +9,10 @@ function renderAdminDashboard(admin) {
   template.csrfToken = getOrCreateCsrfToken();
   return template.evaluate().setTitle('Eagle Hall Pass - Admin');
 }
+
+function clearSystemCache() {
+  const props = PropertiesService.getScriptProperties();
+  props.deleteAllProperties();
+  Logger.log('System cache cleared.');
+  return 'Cache cleared.';
+}
