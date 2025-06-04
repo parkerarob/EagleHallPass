@@ -29,5 +29,15 @@ function toggleDevMode() {
 }
 
 function toggleEmergencyMode() {
-  SpreadsheetApp.getActiveSpreadsheet().toast('Emergency mode placeholder');
+  const current = getSetting('emergencyMode') === 'TRUE';
+  const newVal = current ? 'FALSE' : 'TRUE';
+  const ss = getSpreadsheet();
+  const settings = ss.getSheetByName('Settings');
+  const data = settings.getDataRange().getValues();
+  const row = data.findIndex(r => r[0] === 'emergencyMode') + 1;
+  if (row > 0) {
+    settings.getRange(row, 2).setValue(newVal);
+  }
+  PropertiesService.getScriptProperties().deleteProperty(CACHE_KEY_PREFIX + SHEETS.SETTINGS);
+  SpreadsheetApp.getActiveSpreadsheet().toast('Emergency mode: ' + newVal);
 }
