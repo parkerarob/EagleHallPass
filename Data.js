@@ -10,7 +10,8 @@ const SHEETS = {
   TEACHERS: 'Teacher Data',
   SUPPORT: 'Support Data',
   ADMINS: 'Admin Data',
-  SETTINGS: 'Settings'
+  SETTINGS: 'Settings',
+  BELL_SCHEDULE: 'Bell Schedule'
 };
 
 function getSpreadsheet() {
@@ -71,16 +72,71 @@ function getTeacherByEmail(email) {
   return findByEmail(SHEETS.TEACHERS, email);
 }
 
+function getTeacherById(id) {
+  const data = getData(SHEETS.TEACHERS);
+  return data.find(r => String(r.staffID) === String(id));
+}
+
 function getSupportByEmail(email) {
   return findByEmail(SHEETS.SUPPORT, email);
+}
+
+function getSupportById(id) {
+  const data = getData(SHEETS.SUPPORT);
+  return data.find(r => String(r.staffID) === String(id));
 }
 
 function getAdminByEmail(email) {
   return findByEmail(SHEETS.ADMINS, email);
 }
 
+function getAdminById(id) {
+  const data = getData(SHEETS.ADMINS);
+  return data.find(r => String(r.staffID) === String(id));
+}
+
+function getStaffRecordById(id) {
+  const teacher = getTeacherById(id);
+  if (teacher) return { type: 'teacher', record: teacher };
+  const support = getSupportById(id);
+  if (support) return { type: 'support', record: support };
+  const admin = getAdminById(id);
+  if (admin) return { type: 'admin', record: admin };
+  return null;
+}
+
 function getSetting(key) {
   const data = getData(SHEETS.SETTINGS);
   const entry = data.find(r => r.settingKey === key);
   return entry ? entry.settingValue : null;
+}
+
+function getBellSchedule() {
+  return getData(SHEETS.BELL_SCHEDULE);
+}
+
+function getCurrentPeriod() {
+  const tz = getSetting('systemTimezone') || Session.getScriptTimeZone();
+  const dayType = getSetting('dayType');
+  const schedule = getBellSchedule().filter(p => !dayType || p.dayType === dayType);
+  const nowStr = Utilities.formatDate(new Date(), tz, 'HH:mm');
+  for (let i = 0; i < schedule.length; i++) {
+    if (nowStr >= schedule[i].startTime && nowStr < schedule[i].endTime) {
+      return schedule[i];
+    }
+  }
+  return null;
+}
+
+function getNextPeriod() {
+  const tz = getSetting('systemTimezone') || Session.getScriptTimeZone();
+  const dayType = getSetting('dayType');
+  const schedule = getBellSchedule().filter(p => !dayType || p.dayType === dayType);
+  const nowStr = Utilities.formatDate(new Date(), tz, 'HH:mm');
+  for (let i = 0; i < schedule.length; i++) {
+    if (nowStr < schedule[i].startTime) {
+      return schedule[i];
+    }
+  }
+  return null;
 }

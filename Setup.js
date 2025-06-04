@@ -12,6 +12,7 @@ function onOpen() {
 
 function setupSystem() {
   SpreadsheetApp.getActiveSpreadsheet().toast('Setup placeholder');
+  installAutoCloseTriggers();
 }
 
 function toggleDevMode() {
@@ -40,4 +41,24 @@ function toggleEmergencyMode() {
   }
   PropertiesService.getScriptProperties().deleteProperty(CACHE_KEY_PREFIX + SHEETS.SETTINGS);
   SpreadsheetApp.getActiveSpreadsheet().toast('Emergency mode: ' + newVal);
+}
+
+function installAutoCloseTriggers() {
+  const tz = getSetting('systemTimezone') || Session.getScriptTimeZone();
+  const dayType = getSetting('dayType');
+  const schedule = getBellSchedule().filter(p => !dayType || p.dayType === dayType);
+
+  const triggers = ScriptApp.getProjectTriggers();
+  triggers.forEach(t => {
+    if (t.getHandlerFunction() === 'autoClosePasses') {
+      ScriptApp.deleteTrigger(t);
+    }
+  });
+
+  const today = new Date();
+  schedule.forEach(p => {
+    const [h, m] = String(p.endTime).split(':').map(Number);
+    const d = new Date(today.getFullYear(), today.getMonth(), today.getDate(), h, m, 0);
+    ScriptApp.newTrigger('autoClosePasses').timeBased().at(d).create();
+  });
 }
