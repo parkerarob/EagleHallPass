@@ -229,6 +229,28 @@ function test_legId_increments() {
   }
 }
 
+function test_openPass_sanitizesInput() {
+  const ids = _makeTestIds();
+  const passID = openPass(ids.student, ids.staffA, '=DEST', '=NOTE');
+  try {
+    const row = SpreadsheetApp.getActive()
+      .getSheetByName('Active Passes')
+      .getDataRange()
+      .getValues()
+      .find(r => r[0] === passID);
+    const ok1 = assertEquals("'=DEST", row[4], 'destination sanitized');
+    closePass(passID, ids.staffA, '', '=NOTE');
+    const recordRow = SpreadsheetApp.getActive()
+      .getSheetByName('Permanent Record')
+      .getDataRange()
+      .getValues()
+      .find(r => r[0] === passID);
+    const ok2 = assertEquals("'=NOTE", recordRow[9], 'notes sanitized');
+    return ok1 && ok2;
+  } finally {
+    purgeLogs(passID);
+  }
+}
 function test_updateClosedPass_throws() {
   const ids = _makeTestIds();
   const passID = openPass(ids.student, ids.staffA, ids.dest1, 'closed-update');
@@ -255,6 +277,7 @@ function runAllTests() {
     test_closePass_removesRow(),
     test_autoClosePasses_closes(),
     test_legId_increments(),
+    test_openPass_sanitizesInput(),
     test_updateClosedPass_throws()
   ];
   const passed = results.filter(Boolean).length;
