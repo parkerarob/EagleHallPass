@@ -113,7 +113,12 @@ function sanitizeForSheet(value) {
   return value;
 }
 
-function getCurrentStudentPass(studentID) {
+function getCurrentStudentPass(studentID, csrfToken) {
+  // Validate CSRF token
+  if (csrfToken !== getOrCreateCsrfToken()) {
+    throw new Error('Invalid CSRF token');
+  }
+  
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
@@ -192,59 +197,75 @@ function openPass(studentID, originStaffID, destinationID, notes) {
     try {
     // Prevent pass changes if emergency mode is enabled
     checkEmergencyMode();
-    const sheet = getSheet(ACTIVE_PASSES_SHEET);
-    const data = getActivePassesData();
-    for (let i = 1; i < data.length; i++) {
-      if (data[i][1] === studentID) {
-        throw new PassValidationError(
-          'DUPLICATE_PASS', 
-          'Student already has an active pass',
-          { studentID, existingPassID: data[i][0] }
-        );
-      }
+    // Prevent race conditions on rapid clicks
+    const lockKey = 'PASS_LOCK_' + studentID;
+    const lock = PropertiesService.getScriptProperties();
+    const existingLock = lock.getProperty(lockKey);
+
+    if (existingLock && (Date.now() - parseInt(existingLock)) < 5000) {
+      throw new PassValidationError('RATE_LIMITED', 'Please wait before requesting another pass');
     }
 
-    const passID = generatePassId();
-    const now = new Date();
-    const nowIso = now.toISOString();
-    const safeDest = sanitizeForSheet(destinationID);
-    const safeNotes = sanitizeForSheet(notes);
-    const row = [
-      passID,
-      studentID,
-      originStaffID,
-      originStaffID,
-      safeDest,
-      1,
-      'OPEN',
-      'OUT',
-      now
-    ];
-    
-    // Use setValues instead of appendRow to preserve formatting
-    retrySheetOperation(() => {
-      const lastRow = sheet.getLastRow() + 1;
-      sheet.getRange(lastRow, 1, 1, row.length).setValues([row]);
-    });
+    lock.setProperty(lockKey, Date.now().toString());
 
-    appendPassLog({
-      timestamp: nowIso,
-      passID: passID,
-      legID: 1,
-      studentID: studentID,
-      state: 'OPEN',
-      status: 'OUT',
-      staffID: originStaffID,
-      destinationID: safeDest,
-      flag: '',
-      notes: safeNotes
-    });
-    invalidateSmartCache('open', studentID);
-    return passID;
-  } catch (err) {
-    Logger.log(err.stack || err.message);
-    throw err;
-  }
+    try {
+      // Existing duplicate check code stays here
+      const sheet = getSheet(ACTIVE_PASSES_SHEET);
+      const data = getActivePassesData();
+      for (let i = 1; i < data.length; i++) {
+        if (data[i][1] === studentID) {
+          throw new PassValidationError(
+            'DUPLICATE_PASS', 
+            'Student already has an active pass',
+            { studentID, existingPassID: data[i][0] }
+          );
+        }
+      }
+
+      const passID = generatePassId();
+      const now = new Date();
+      const nowIso = now.toISOString();
+      const safeDest = sanitizeForSheet(destinationID);
+      const safeNotes = sanitizeForSheet(notes);
+      const row = [
+        passID,
+        studentID,
+        originStaffID,
+        originStaffID,
+        safeDest,
+        1,
+        'OPEN',
+        'OUT',
+        now
+      ];
+      
+      // Use setValues instead of appendRow to preserve formatting
+      retrySheetOperation(() => {
+        const lastRow = sheet.getLastRow() + 1;
+        sheet.getRange(lastRow, 1, 1, row.length).setValues([row]);
+      });
+
+      appendPassLog({
+        timestamp: nowIso,
+        passID: passID,
+        legID: 1,
+        studentID: studentID,
+        state: 'OPEN',
+        status: 'OUT',
+        staffID: originStaffID,
+        destinationID: safeDest,
+        flag: '',
+        notes: safeNotes
+      });
+      invalidateSmartCache('open', studentID);
+      // Clear the lock on success
+      lock.deleteProperty(lockKey);
+      return passID;
+    } catch (err) {
+      // Clear the lock on error
+      lock.deleteProperty(lockKey);
+      throw err;
+    }
   });
 }
 
@@ -392,6 +413,37 @@ function closePass(passID, closingStaffID, flag, notes) {
     throw err;
   }
   });
+}
+
+function closePassStudent(passID, csrfToken) {
+  // Validate CSRF token
+  if (csrfToken !== getOrCreateCsrfToken()) {
+    throw new Error('Invalid CSRF token');
+  }
+  
+  // Get the pass to find the student
+  const sheet = getSheet(ACTIVE_PASSES_SHEET);
+  const data = getActivePassesData();
+  let passRow = null;
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === passID) {
+      passRow = data[i];
+      break;
+    }
+  }
+  
+  if (!passRow) {
+    throw new PassNotFoundError(passID);
+  }
+  
+  const studentID = passRow[1];
+  const currentStaffID = passRow[3];
+  
+  // Use existing closePass function
+  closePass(passID, currentStaffID, '', 'Student self-close');
+  
+  return null; // Student expects null after closing
 }
 
 function autoClosePasses() {
@@ -682,4 +734,35 @@ function autoClosePassesEnhanced() {
     Logger.log(`Auto-close error: ${err.stack || err.message}`);
     throw err;
   }
+}
+
+function requestPass(studentID, destination, csrfToken) {
+  // Validate CSRF token
+  if (csrfToken !== getOrCreateCsrfToken()) {
+    throw new Error('Invalid CSRF token');
+  }
+  
+  // Validate student exists and get their current teacher
+  const student = getStudentById(studentID);
+  if (!student) {
+    throw new Error('Student not found');
+  }
+  
+  // Get current period to determine origin staff
+  const currentPeriod = getCurrentPeriod();
+  if (!currentPeriod) {
+    throw new Error('No active period - cannot create pass');
+  }
+  
+  // Get the teacher for current period
+  const originStaffID = student[currentPeriod.period];
+  if (!originStaffID) {
+    throw new Error('No teacher assigned for current period');
+  }
+  
+  // Create the pass using existing openPass function
+  const passID = openPass(studentID, originStaffID, destination, 'Student self-request');
+  
+  // Return the created pass
+  return getCurrentStudentPass(studentID, csrfToken);
 }

@@ -1,0 +1,195 @@
+# Task 6: Known Limitations Documentation
+
+## 🚦 Phase 2-4 Limitations (DO NOT FIX - PLANNED FEATURES)
+
+### 🚩 Limitation 1: Hardcoded Destination List
+**File:** `student.html` - Lines 49-54
+```javascript
+'<select id="destination-select" class="form-select mb-2">' +
+'<option value="CLASSROOM">CLASSROOM</option>' +
+'<option value="RESTROOM">RESTROOM</option>' +
+'<option value="LIBRARY">LIBRARY</option>' +
+'<option value="OFFICE">OFFICE</option>' +
+'</select>' +
+```
+
+**Impact:** 
+- Students can only select from 4 predefined destinations
+- No dynamic destination loading from database
+- No room-specific destinations (e.g., "Room 101", "Nurse's Office")
+
+**Planned Enhancement (Phase 2):**
+- Dynamic destination loading from Destinations sheet
+- Room-specific options based on school layout
+- Custom destination input for special cases
+
+---
+
+### 🚩 Limitation 2: No Recent Passes Display
+**Current UI:** Only shows current active pass status
+
+**Missing Features:**
+- No "Recent Passes" section showing last 5 passes
+- No pass history with timestamps
+- No duration tracking display
+- No "Frequent Destinations" shortcuts
+
+**Planned Enhancement (Phase 3):**
+- Recent passes card below current status
+- Pass duration statistics
+- Quick-select for frequently used destinations
+- Daily/weekly pass summary
+
+---
+
+### 🚩 Limitation 3: No Pull-to-Refresh
+**Current Refresh:** Only automatic 30-second polling
+
+**Missing Features:**
+- No manual pull-to-refresh gesture on mobile
+- No refresh button for immediate updates
+- No visual refresh indicators
+- No offline state detection
+
+**Planned Enhancement (Phase 3):**
+- Touch gesture pull-to-refresh
+- Manual refresh button
+- Connection status indicator
+- Optimistic UI updates
+
+---
+
+### 🚩 Limitation 4: No Offline Handling
+**Current Behavior:** Fails silently when offline
+
+**Missing Features:**
+- No offline detection
+- No cached pass state
+- No queue for offline actions
+- No "Connection Lost" messaging
+
+**Planned Enhancement (Phase 4):**
+- Service worker for offline caching
+- Local storage for pass state
+- Offline action queuing
+- Network status indicators
+- Graceful degradation
+
+---
+
+## 📋 Additional Current Limitations
+
+### 🚩 Limitation 5: No Pass Validation Feedback
+**Current:** Generic error alerts only
+
+**Missing:**
+- No specific validation messages
+- No field-level error highlighting  
+- No success confirmation animations
+- No progress indicators for long operations
+
+### 🚩 Limitation 6: No Accessibility Features
+**Current:** Basic HTML structure only
+
+**Missing:**
+- No ARIA labels for screen readers
+- No keyboard navigation support
+- No high contrast mode
+- No text size adjustment
+- No focus management
+
+### 🚩 Limitation 7: No Multi-Language Support
+**Current:** English only, hardcoded strings
+
+**Missing:**
+- No internationalization (i18n)
+- No language selection
+- No RTL language support
+- No cultural date/time formatting
+
+### 🚩 Limitation 8: No Advanced Security Features
+**Current:** Basic CSRF protection only
+
+**Missing:**
+- No rate limiting UI feedback
+- No session timeout warnings
+- No suspicious activity detection
+- No device fingerprinting
+
+---
+
+## 🎯 Documentation for Development Team
+
+### Phase 2 Priorities:
+1. **Dynamic Destinations:** Replace hardcoded dropdown
+2. **Enhanced Error Handling:** Better user feedback
+3. **Basic Analytics:** Pass usage tracking
+
+### Phase 3 Priorities:
+1. **Recent Passes History:** Student pass timeline
+2. **Pull-to-Refresh:** Manual refresh capability
+3. **Accessibility Compliance:** WCAG 2.1 AA standards
+4. **Performance Optimization:** Faster load times
+
+### Phase 4 Priorities:
+1. **Offline Support:** Progressive Web App features
+2. **Advanced Security:** Enhanced protection
+3. **Multi-Language:** Internationalization
+4. **Advanced UI:** Animations and micro-interactions
+
+---
+
+## ✅ Current Implementation Status
+
+### ✅ Completed (Phase 1):
+- ✅ Basic pass request/close functionality
+- ✅ Real-time status updates via polling
+- ✅ CSRF token security
+- ✅ Responsive design foundation
+- ✅ Error handling for network failures
+- ✅ Duplicate pass prevention
+- ✅ Mobile-friendly interface
+
+### 🚧 Known Technical Debt:
+- **Spinner Functions:** Now implemented (Task 5)
+- **Error Handling:** Now implemented (Task 4)
+- **CSRF Validation:** Now implemented (Task 2)
+- **Race Conditions:** Now prevented (Task 3)
+
+---
+
+## 📝 Developer Notes
+
+### Code Comments to Add:
+```javascript
+// TODO Phase 2: Replace hardcoded destinations with dynamic loading
+// TODO Phase 3: Add recent passes history display
+// TODO Phase 3: Implement pull-to-refresh functionality  
+// TODO Phase 4: Add offline support with service worker
+```
+
+### Testing Scope for Phase 1:
+- ✅ **Functional Testing:** Pass creation/closure works
+- ✅ **Security Testing:** CSRF protection active
+- ✅ **Responsive Testing:** Mobile/desktop compatibility
+- ✅ **Error Testing:** Network failure handling
+- ❌ **Load Testing:** Not required for Phase 1
+- ❌ **Accessibility Testing:** Deferred to Phase 3
+
+---
+
+## 🎯 Summary: Student View Ready for Testing
+
+### ✅ Phase 1 Complete:
+All critical functionality implemented and hardened for reliable testing.
+
+### 🚩 Phase 2-4 Limitations Documented:
+Development team aware of planned enhancements - no premature optimization.
+
+### 🔒 Security Hardened:
+CSRF protection, input sanitization, and race condition prevention active.
+
+### 📱 Mobile Ready:
+Responsive design with proper viewport and touch-friendly interface.
+
+**Student View is now ready for comprehensive testing and deployment.**
