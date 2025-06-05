@@ -155,6 +155,29 @@ function getStudentsForTeacherCurrentPeriod(staffID) {
   return students.filter(s => String(s[period]) === String(staffID));
 }
 
+/**
+ * Get students for teacher with lazy loading and caching
+ * @param {string} staffID - Staff ID
+ * @returns {Array} Array of student objects
+ */
+function getStudentsForTeacherCurrentPeriodOptimized(staffID) {
+  const cacheKey = 'TEACHER_STUDENTS_' + staffID;
+  const cached = getCachedData(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const current = getCurrentPeriod();
+  if (!current) return [];
+
+  const period = current.period;
+  const students = getData(SHEETS.STUDENTS);
+  const result = students.filter(s => String(s[period]) === String(staffID));
+
+  setCachedData(cacheKey, result);
+  return result;
+}
+
 function getActivePassesForTeacher(staffID) {
   const classStudents = getStudentsForTeacherCurrentPeriod(staffID);
   const ids = classStudents.map(s => String(s.studentID));
@@ -179,4 +202,48 @@ function getActivePassesForTeacher(staffID) {
         studentName: student ? student.firstName + ' ' + student.lastName : ''
       };
     });
+}
+
+/**
+ * Get active passes for teacher with optimized caching
+ * @param {string} staffID - Staff ID
+ * @returns {Array} Array of active pass objects
+ */
+function getActivePassesForTeacherOptimized(staffID) {
+  const cacheKey = 'TEACHER_PASSES_' + staffID;
+  const cached = getCachedData(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const classStudents = getStudentsForTeacherCurrentPeriodOptimized(staffID);
+  const ids = classStudents.map(s => String(s.studentID));
+  if (ids.length === 0) return [];
+
+  const activePassesData = getActivePassesData();
+  const result = activePassesData
+    .slice(1)
+    .filter(r => ids.includes(String(r[1])))
+    .map(r => {
+      const student = classStudents.find(s => String(s.studentID) === String(r[1]));
+      return {
+        passID: r[0],
+        studentID: r[1],
+        staffID: r[3],
+        destinationID: r[4],
+        legID: r[5],
+        state: r[6],
+        status: r[7],
+        startTime: r[8],
+        studentName: student ? student.firstName + ' ' + student.lastName : ''
+      };
+    });
+
+  const cache = PropertiesService.getScriptProperties();
+  cache.setProperty(
+    CACHE_KEY_PREFIX + cacheKey,
+    JSON.stringify({ value: result, expireAt: Date.now() + 60 * 1000 })
+  );
+
+  return result;
 }
