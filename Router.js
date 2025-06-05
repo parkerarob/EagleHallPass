@@ -47,12 +47,40 @@ function doPost(e) {
       case 'closePass':
         closePass(data.passID, user.record.staffID, data.flag, data.notes);
         break;
+      case 'requestPass':
+        if (user.role !== 'student') {
+          throw new Error('Unauthorized - Students only');
+        }
+        const newPass = requestPass(data.studentID, data.destination, token);
+        return ContentService.createTextOutput(JSON.stringify(newPass));
+      case 'closePassStudent':
+        if (user.role !== 'student') {
+          throw new Error('Unauthorized - Students only');
+        }
+        closePassStudent(data.passID, token);
+        break;
       default:
         throw new Error('Unknown action');
     }
     return ContentService.createTextOutput('OK');
   } catch (err) {
     Logger.log(err.stack || err.message);
-    return ContentService.createTextOutput('ERROR');
+    return ContentService.createTextOutput('ERROR: ' + err.message);
   }
+}
+
+// Expose functions for google.script.run calls from student UI
+function getStudentPassStatus(studentID) {
+  const token = getOrCreateCsrfToken();
+  return getCurrentStudentPass(studentID, token);
+}
+
+function createStudentPass(studentID, destination) {
+  const token = getOrCreateCsrfToken();
+  return requestPass(studentID, destination, token);
+}
+
+function closeStudentPass(passID) {
+  const token = getOrCreateCsrfToken();
+  return closePassStudent(passID, token);
 }

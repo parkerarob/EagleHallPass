@@ -15,6 +15,8 @@ const SHEETS = {
   BELL_SCHEDULE: 'Bell Schedule'
 };
 
+const ACTIVE_PASSES_SHEET = 'Active Passes';
+
 function getSpreadsheet() {
   return SpreadsheetApp.getActiveSpreadsheet();
 }
@@ -23,12 +25,19 @@ function getCachedData(key) {
   const cache = PropertiesService.getScriptProperties();
   const data = cache.getProperty(CACHE_KEY_PREFIX + key);
   if (!data) return null;
-  const parsed = JSON.parse(data);
-  if (Date.now() > parsed.expireAt) {
+  
+  try {
+    const parsed = JSON.parse(data);
+    if (Date.now() > parsed.expireAt) {
+      cache.deleteProperty(CACHE_KEY_PREFIX + key);
+      return null;
+    }
+    return parsed.value;
+  } catch (e) {
+    // Invalid JSON, clear it
     cache.deleteProperty(CACHE_KEY_PREFIX + key);
     return null;
   }
-  return parsed.value;
 }
 
 function setCachedData(key, value) {

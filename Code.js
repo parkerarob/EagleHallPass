@@ -6,7 +6,6 @@
 
 const PASS_LOG_SHEET = 'Pass Log';
 const ACTIVE_PASSES_SHEET = 'Active Passes';
-const CACHE_KEY_PREFIX = 'EHP_CACHE_';
 const PERMANENT_RECORD_SHEET = 'Permanent Record';
 
 
