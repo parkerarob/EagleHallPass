@@ -6,7 +6,10 @@
 
 const PASS_LOG_SHEET = 'Pass Log';
 const ACTIVE_PASSES_SHEET = 'Active Passes';
+const CACHE_KEY_PREFIX = 'EHP_CACHE_';
 const PERMANENT_RECORD_SHEET = 'Permanent Record';
+
+
 
 /**
  * Custom error types for better error handling and debugging
@@ -195,75 +198,145 @@ function getAllActivePasses() {
 function openPass(studentID, originStaffID, destinationID, notes) {
   return monitorPerformance('openPass', () => {
     try {
-    // Prevent pass changes if emergency mode is enabled
-    checkEmergencyMode();
-    // Prevent race conditions on rapid clicks
-    const lockKey = 'PASS_LOCK_' + studentID;
-    const lock = PropertiesService.getScriptProperties();
-    const existingLock = lock.getProperty(lockKey);
 
-    if (existingLock && (Date.now() - parseInt(existingLock)) < 5000) {
-      throw new PassValidationError('RATE_LIMITED', 'Please wait before requesting another pass');
-    }
 
-    lock.setProperty(lockKey, Date.now().toString());
 
-    try {
-      // Existing duplicate check code stays here
-      const sheet = getSheet(ACTIVE_PASSES_SHEET);
-      const data = getActivePassesData();
-      for (let i = 1; i < data.length; i++) {
-        if (data[i][1] === studentID) {
-          throw new PassValidationError(
-            'DUPLICATE_PASS', 
-            'Student already has an active pass',
-            { studentID, existingPassID: data[i][0] }
-          );
-        }
+
+
+
+      // Prevent pass changes if emergency mode is enabled
+      checkEmergencyMode();
+      
+      // Prevent race conditions on rapid clicks
+      const lockKey = 'PASS_LOCK_' + studentID;
+      const lock = PropertiesService.getScriptProperties();
+      const existingLock = lock.getProperty(lockKey);
+
+
+
+
+      if (existingLock && (Date.now() - parseInt(existingLock)) < 5000) {
+        throw new PassValidationError('RATE_LIMITED', 'Please wait before requesting another pass');
       }
 
-      const passID = generatePassId();
-      const now = new Date();
-      const nowIso = now.toISOString();
-      const safeDest = sanitizeForSheet(destinationID);
-      const safeNotes = sanitizeForSheet(notes);
-      const row = [
-        passID,
-        studentID,
-        originStaffID,
-        originStaffID,
-        safeDest,
-        1,
-        'OPEN',
-        'OUT',
-        now
-      ];
-      
-      // Use setValues instead of appendRow to preserve formatting
-      retrySheetOperation(() => {
-        const lastRow = sheet.getLastRow() + 1;
-        sheet.getRange(lastRow, 1, 1, row.length).setValues([row]);
-      });
 
-      appendPassLog({
-        timestamp: nowIso,
-        passID: passID,
-        legID: 1,
-        studentID: studentID,
-        state: 'OPEN',
-        status: 'OUT',
-        staffID: originStaffID,
-        destinationID: safeDest,
-        flag: '',
-        notes: safeNotes
-      });
-      invalidateSmartCache('open', studentID);
-      // Clear the lock on success
-      lock.deleteProperty(lockKey);
-      return passID;
+      lock.setProperty(lockKey, Date.now().toString());
+
+
+
+
+
+
+
+
+
+
+
+
+      try {
+        // Existing duplicate check code stays here
+        const sheet = getSheet(ACTIVE_PASSES_SHEET);
+        const data = getActivePassesData();
+        for (let i = 1; i < data.length; i++) {
+          if (data[i][1] === studentID) {
+            throw new PassValidationError(
+              'DUPLICATE_PASS', 
+              'Student already has an active pass',
+              { studentID, existingPassID: data[i][0] }
+            );
+          }
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        const passID = generatePassId();
+        const now = new Date();
+        const nowIso = now.toISOString();
+        const safeDest = sanitizeForSheet(destinationID);
+        const safeNotes = sanitizeForSheet(notes);
+        const row = [
+          passID,
+          studentID,
+          originStaffID,
+          originStaffID,
+          safeDest,
+          1,
+          'OPEN',
+          'OUT',
+          now
+        ];
+        
+        // Use setValues instead of appendRow to preserve formatting
+        retrySheetOperation(() => {
+          const lastRow = sheet.getLastRow() + 1;
+          sheet.getRange(lastRow, 1, 1, row.length).setValues([row]);
+        });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+        appendPassLog({
+          timestamp: nowIso,
+          passID: passID,
+          legID: 1,
+          studentID: studentID,
+          state: 'OPEN',
+          status: 'OUT',
+          staffID: originStaffID,
+          destinationID: safeDest,
+          flag: '',
+          notes: safeNotes
+        });
+        
+        invalidateSmartCache('open', studentID);
+        
+        // Clear the lock on success
+        lock.deleteProperty(lockKey);
+        return passID;
+        
+      } catch (err) {
+        // Clear the lock on error
+        lock.deleteProperty(lockKey);
+        throw err;
+      }
     } catch (err) {
-      // Clear the lock on error
-      lock.deleteProperty(lockKey);
+
+
+      Logger.log(err.stack || err.message);
       throw err;
     }
   });
