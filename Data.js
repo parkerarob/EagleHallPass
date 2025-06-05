@@ -2,6 +2,7 @@
 // Provides helpers for retrieving data from Google Sheets
 // and caching it in PropertiesService for performance.
 
+// Import cache key prefix from Code.js scope
 const CACHE_KEY_PREFIX = 'EHP_CACHE_';
 const CACHE_EXPIRATION_MINUTES = 5;
 

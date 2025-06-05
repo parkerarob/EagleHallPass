@@ -239,14 +239,14 @@ function test_openPass_sanitizesInput() {
       .getDataRange()
       .getValues()
       .find(r => r[0] === passID);
-    const ok1 = assertEquals("'=DEST", row[4], 'destination sanitized');
+    const ok1 = assertEquals(" '=DEST", row[4], 'destination sanitized');
     closePass(passID, ids.staffA, '', '=NOTE');
     const recordRow = SpreadsheetApp.getActive()
       .getSheetByName('Permanent Record')
       .getDataRange()
       .getValues()
       .find(r => r[0] === passID);
-    const ok2 = assertEquals("'=NOTE", recordRow[9], 'notes sanitized');
+    const ok2 = assertEquals(" '=NOTE", recordRow[9], 'notes sanitized');
     return ok1 && ok2;
   } finally {
     purgeLogs(passID);
