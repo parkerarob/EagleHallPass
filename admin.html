@@ -3,79 +3,261 @@
   <head>
     <base target="_top">
     <title>Admin Dashboard</title>
+    <link rel="stylesheet" href="common.css">
+    <style>
+      body { margin: 0; font-family: Arial, sans-serif; }
+      .header { background:#00274c; color:#ffcb05; padding:10px; display:flex; align-items:center; }
+      .header h1 { flex:1; margin:0; font-size:1.5em; }
+      .filters { display:flex; flex-wrap:wrap; gap:10px; align-items:center; padding:10px; }
+      .grid { display:flex; flex-wrap:wrap; gap:2%; }
+      .pass-card { width:100%; margin-bottom:10px; position:relative; }
+      @media(min-width:768px){ .pass-card{width:31%;} }
+      @media(min-width:481px) and (max-width:767px){ .pass-card{width:48%;} }
+      .pass-card.deemphasized { background:#f0f0f0; color:#888; }
+      .badge { position:absolute; top:8px; right:8px; padding:2px 6px; border-radius:4px; font-size:0.8em; color:#fff; }
+      .badge.yellow { background:#f0ad4e; }
+      .badge.red { background:#d9534f; }
+      .drawer-backdrop { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.5); display:none; }
+      .drawer { position:absolute; top:0; right:-400px; width:300px; max-width:80%; height:100%; background:#fff; box-shadow:-2px 0 5px rgba(0,0,0,0.3); overflow:auto; transition:right 0.3s; padding:15px; }
+      .drawer.open { right:0; }
+      .search-section { max-width:800px; margin:10px auto; }
+      .reports { max-width:800px; margin:20px auto; display:flex; flex-wrap:wrap; gap:10px; }
+      .report-card { flex:1 1 250px; }
+      .hidden { display:none; }
+    </style>
   </head>
   <body>
-    <h1>Admin Dashboard</h1>
-    <p>Welcome, <?= admin.firstName ?> <?= admin.lastName ?>.</p>
-    <div id="emergency-status">Emergency Mode: <span id="emergency-status-text">Loading...</span></div>
-      <button onclick="toggleEmergency()">Toggle Emergency Mode</button>
-      <button onclick="testAutoClose()">Test Auto Close</button>
-      <button onclick="clearCache()">Force Clear Cache</button>
+    <div class="card header">
+      <h1>Admin Dashboard</h1>
+      <span>Welcome, <?= admin.firstName ?> <?= admin.lastName ?>.</span>
+      <button id="help-button" type="button" class="btn-secondary">Help</button>
+    </div>
 
-      <div id="out-students" style="display:none;">
-        <h3>Students Currently OUT</h3>
-        <ul id="out-students-list"></ul>
+    <div class="card filters">
+      <label><input type="radio" name="statusFilter" value="OUT" checked> Show OUT Passes Only</label>
+      <label><input type="radio" name="statusFilter" value="ALL"> Show All Active Passes</label>
+      <label><input id="priority-toggle" type="checkbox"> Show Only Overdue Passes (&gt;10 min)</label>
+      <input id="date-filter" type="date">
+      <button id="search-date" class="btn-secondary" type="button">Search</button>
+      <button id="refresh-button" class="btn-secondary" type="button">Refresh</button>
+    </div>
+
+    <div id="passes-container" class="grid"></div>
+
+    <div class="search-section">
+      <input id="admin-search" type="text" placeholder="Search by student, teacher, ID, or email" style="width:100%; padding:8px;">
+    </div>
+
+    <div class="reports">
+      <div class="card">
+        <input id="report-date" type="date">
+        <button id="daily-report-button" class="btn-primary" type="button">Get Daily Report</button>
+        <div id="daily-report" class="report-card"></div>
       </div>
+      <div class="card">
+        <input id="report-week" type="date">
+        <button id="weekly-report-button" class="btn-primary" type="button">Get Weekly Report</button>
+        <div id="weekly-report" class="report-card"></div>
+      </div>
+      <div class="card">
+        <input id="report-month" type="month">
+        <button id="monthly-report-button" class="btn-primary" type="button">Get Monthly Report</button>
+        <div id="monthly-report" class="report-card"></div>
+      </div>
+    </div>
 
-      <h3>Who Am I?</h3>
-      <div id="whoami"></div>
+    <div id="drawer-backdrop" class="drawer-backdrop">
+      <div id="drawer" class="drawer"></div>
+    </div>
 
+    <script src="common.js"></script>
     <script>
-      const CSRF_TOKEN = '<?= csrfToken ?>';
-      function updateEmergencyStatus(isOn) {
-        var text = document.getElementById('emergency-status-text');
-        text.textContent = isOn ? 'ON' : 'OFF';
-        var section = document.getElementById('out-students');
-        if (isOn) {
-          section.style.display = 'block';
-          google.script.run.withSuccessHandler(renderOutStudents).getOutStudents();
-        } else {
-          section.style.display = 'none';
-        }
+      var alerted = {};
+      var debounceTimer;
+
+      function todayStr() {
+        var d = new Date();
+        return d.toISOString().split('T')[0];
       }
 
-      function renderOutStudents(list) {
-        var ul = document.getElementById('out-students-list');
-        ul.innerHTML = '';
-        list.forEach(function(s) {
-          var li = document.createElement('li');
-          li.textContent = s.firstName + ' ' + s.lastName;
-          ul.appendChild(li);
+      function setControlsDisabled(disabled) {
+        document.querySelectorAll('.filters input, .filters button').forEach(function(el){
+          el.disabled = disabled;
+          if(disabled && el.type==='button') showSpinner(el.id); else if(!disabled && el.type==='button') hideSpinner(el.id);
         });
       }
 
-      function fetchEmergencyStatus() {
-        google.script.run.withSuccessHandler(updateEmergencyStatus).getEmergencyMode();
+      function refreshPassGrid() {
+        setControlsDisabled(true);
+        var date = document.getElementById('date-filter').value || todayStr();
+        google.script.run.withSuccessHandler(function(allPasses){
+          var filterStatus = document.querySelector('input[name="statusFilter"]:checked').value;
+          var priority = document.getElementById('priority-toggle').checked;
+          var now = Date.now();
+          var passes = allPasses.filter(function(p){
+            if(filterStatus === 'OUT' && p.status !== 'OUT') return false;
+            if(priority) {
+              var dur = (now - new Date(p.startTime).getTime())/60000;
+              if(dur <= 10) return false;
+            }
+            return true;
+          });
+          renderPassGrid(passes);
+          setControlsDisabled(false);
+        }).getPassHistoryByDate(date);
       }
 
-      function toggleEmergency() {
-        google.script.run.withSuccessHandler(fetchEmergencyStatus).toggleEmergencyMode();
+      function renderPassGrid(passes){
+        var container = document.getElementById('passes-container');
+        container.innerHTML='';
+        var now = Date.now();
+        passes.forEach(function(pass){
+          var dur = Math.floor((now - new Date(pass.startTime).getTime())/60000);
+          var card = document.createElement('div');
+          card.className = 'card pass-card';
+          card.dataset.passId = pass.passID;
+          if(pass.status === 'IN') card.classList.add('deemphasized');
+          var html = '<h3>'+pass.studentName+' ('+pass.studentID+')</h3>'+
+            '<p>Teacher: '+pass.teacherName+'</p>'+
+            '<p>Destination: '+pass.destination+'</p>'+
+            '<p>Status: '+pass.status+'</p>'+
+            '<p>Started: '+new Date(pass.startTime).toLocaleTimeString()+'</p>'+
+            '<p>Duration: '+dur+' min</p>'+
+            '<button id="details-'+pass.passID+'" class="btn-secondary" type="button">Details</button>';
+          card.innerHTML = html;
+          if(pass.status === 'OUT'){
+            if(dur>10 && dur<=20){
+              var badge=document.createElement('div');
+              badge.className='badge yellow';
+              badge.textContent='! 10+ min';
+              card.appendChild(badge);
+            } else if(dur>20){
+              var badge=document.createElement('div');
+              badge.className='badge red';
+              badge.textContent='!! 20+ min';
+              card.appendChild(badge);
+              if(!alerted[pass.passID]){
+                alerted[pass.passID]=true;
+                google.script.run.sendAdminAlert(pass.passID,'overdue');
+              }
+            }
+          }
+          container.appendChild(card);
+          document.getElementById('details-'+pass.passID).onclick=function(){loadPassDetails(pass.passID);};
+        });
       }
 
-        function testAutoClose() {
-          google.script.run.withSuccessHandler(function() {
-            alert('Auto-close routine executed.');
-          }).autoClosePasses();
-        }
+      function loadPassDetails(id){
+        var btn=document.getElementById('details-'+id);
+        btn.disabled=true; showSpinner('details-'+id);
+        google.script.run.withSuccessHandler(function(pass){
+          btn.disabled=false; hideSpinner('details-'+id);
+          showPassDetails(pass);
+        }).getPassDetails(id);
+      }
 
-        function clearCache() {
-          google.script.run.withSuccessHandler(function(msg) {
-            alert(msg);
-          }).clearSystemCache();
-        }
+      function showPassDetails(pass){
+        var drawer=document.getElementById('drawer');
+        var overlay=document.getElementById('drawer-backdrop');
+        drawer.innerHTML = '<div class="drawer-header"><h2>Pass Details</h2><button id="drawer-close" type="button" class="btn-secondary">Close</button></div>'+
+          '<div class="drawer-body">'+
+          '<p><strong>Student:</strong> '+pass.studentName+' ('+pass.studentID+')</p>'+
+          '<p><strong>Teacher:</strong> '+pass.teacherName+'</p>'+
+          '<p><strong>Origin Staff:</strong> '+pass.originStaffName+'</p>'+
+          '<p><strong>Destination:</strong> '+pass.destination+'</p>'+
+          '<p><strong>Started:</strong> '+new Date(pass.startTime).toLocaleString()+'</p>'+
+          '<p><strong>Status:</strong> '+pass.status+'</p>'+
+          '<p><strong>Notes:</strong> '+(pass.notes||'')+'</p>'+
+          '</div>';
+        overlay.style.display='block';
+        setTimeout(function(){drawer.classList.add('open');},10);
+        document.getElementById('drawer-close').onclick=closeDrawer;
+      }
 
-        function fetchWhoAmI() {
-          google.script.run.withSuccessHandler(function(res) {
-            var div = document.getElementById('whoami');
-            div.textContent =
-              'Email: ' + res.email +
-              ' | Role: ' + res.role +
-              ' | Source: ' + res.source;
-          }).whoAmI();
-        }
+      function closeDrawer(){
+        var overlay=document.getElementById('drawer-backdrop');
+        var drawer=document.getElementById('drawer');
+        drawer.classList.remove('open');
+        setTimeout(function(){overlay.style.display='none';},300);
+      }
 
-        fetchEmergencyStatus();
-        fetchWhoAmI();
-      </script>
+      function debouncedSearch(){
+        clearTimeout(debounceTimer);
+        debounceTimer=setTimeout(function(){
+          var q=document.getElementById('admin-search').value.trim();
+          if(q.length>=2){
+            google.script.run.withSuccessHandler(renderPassGrid).searchPasses(q);
+          } else {
+            refreshPassGrid();
+          }
+        },300);
+      }
+
+      function renderDailyReport(data){
+        var div=document.getElementById('daily-report');
+        div.innerHTML='<div class="card report-card">'+
+          'Total Passes Requested: '+data.totalRequested+'<br>'+
+          'Total Passes Closed: '+data.totalClosed+'<br>'+
+          'Average Duration: '+data.averageDuration+' min<br>'+
+          'Longest Duration: '+data.longestDuration+' min</div>';
+        hideSpinner('daily-report-button');
+        document.getElementById('daily-report-button').disabled=false;
+      }
+
+      function renderWeeklyReport(data){
+        var div=document.getElementById('weekly-report');
+        div.innerHTML='<div class="card report-card">'+
+          'Total Passes Requested: '+data.totalRequested+'<br>'+
+          'Total Passes Closed: '+data.totalClosed+'<br>'+
+          'Average Duration: '+data.averageDuration+' min<br>'+
+          'Longest Duration: '+data.longestDuration+' min</div>';
+        hideSpinner('weekly-report-button');
+        document.getElementById('weekly-report-button').disabled=false;
+      }
+
+      function renderMonthlyReport(data){
+        var div=document.getElementById('monthly-report');
+        div.innerHTML='<div class="card report-card">'+
+          'Total Passes Requested: '+data.totalRequested+'<br>'+
+          'Total Passes Closed: '+data.totalClosed+'<br>'+
+          'Average Duration: '+data.averageDuration+' min<br>'+
+          'Longest Duration: '+data.longestDuration+' min</div>';
+        hideSpinner('monthly-report-button');
+        document.getElementById('monthly-report-button').disabled=false;
+      }
+
+      document.getElementById('search-date').onclick=refreshPassGrid;
+      document.getElementById('refresh-button').onclick=refreshPassGrid;
+      document.querySelectorAll('input[name="statusFilter"]').forEach(function(el){el.onchange=refreshPassGrid;});
+      document.getElementById('priority-toggle').onchange=refreshPassGrid;
+      document.getElementById('admin-search').onkeyup=debouncedSearch;
+      document.getElementById('daily-report-button').onclick=function(){
+        var btn=this; btn.disabled=true; showSpinner('daily-report-button');
+        google.script.run.withSuccessHandler(renderDailyReport).getDailyReport(document.getElementById('report-date').value);
+      };
+      document.getElementById('weekly-report-button').onclick=function(){
+        var btn=this; btn.disabled=true; showSpinner('weekly-report-button');
+        var d=document.getElementById('report-week').value;
+        if(google.script.run.getWeeklyReport){
+          google.script.run.withSuccessHandler(renderWeeklyReport).getWeeklyReport(d);
+        } else {
+          renderWeeklyReport({totalRequested:0,totalClosed:0,averageDuration:0,longestDuration:0});
+        }
+      };
+      document.getElementById('monthly-report-button').onclick=function(){
+        var btn=this; btn.disabled=true; showSpinner('monthly-report-button');
+        var d=document.getElementById('report-month').value;
+        if(google.script.run.getMonthlyReport){
+          google.script.run.withSuccessHandler(renderMonthlyReport).getMonthlyReport(d);
+        } else {
+          renderMonthlyReport({totalRequested:0,totalClosed:0,averageDuration:0,longestDuration:0});
+        }
+      };
+
+      document.getElementById('date-filter').value=todayStr();
+      document.getElementById('report-date').value=todayStr();
+
+      refreshPassGrid();
+    </script>
   </body>
 </html>
