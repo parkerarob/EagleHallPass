@@ -1,0 +1,455 @@
+---
+
+# Eagle Hall Pass System
+
+# FULL DRAFT SPEC v1.0
+
+---
+
+## 1. Purpose & Scope
+
+The Eagle Hall Pass System is a **student-driven, transparency-focused digital system** for tracking student hallway movement during the school day.
+
+It replaces paper-based passes with a digital system that supports **accountability, safety, and long-term visibility**, while maintaining a strong commitment to being **non-intrusive for teachers**.
+
+### Core Philosophy:
+
+* The system is **student-driven** — students initiate and manage their own passes.
+* **Teachers are never required** to interact with the system beyond optionally enabling or disabling pass requests (via autonomy triggers).
+* The system must **not interfere with instructional time** or place undue responsibility on teachers.
+* It is **not an attendance system** or **disciplinary system**.
+* It is a **hallway accountability tool** — tracking when students leave a class and where they are if not in their scheduled class.
+
+### Long-term Value:
+
+* Pass records are **permanently stored**:
+
+  * Minimum retention: **one semester** (half year).
+  * Target retention: **entire student history** at the school.
+* Long-term records enable:
+
+  * **Behavior trend analysis**
+  * **Support interventions**
+  * **Building trust** between students, teachers, and staff
+  * **Identification of students at risk of hallway misuse (black hole effect)**
+
+### Key Goals:
+
+* Provide **real-time visibility** of student movement.
+* Empower students to self-manage and document their hallway activity.
+* Minimize required teacher interaction — **teachers maintain autonomy** over whether passes can come TO or FROM their rooms.
+* Support **positive school culture** by making hallway accountability transparent and trusted.
+* Enable **support staff and administration** to:
+
+  * **Quickly identify students misusing the system**
+  * **Respond appropriately**
+  * **Support interventions** based on **data-driven trends**, not anecdotal evidence.
+
+---
+
+### Special Support Use Case: “Found in Hallway Without Pass”
+
+* If a student is found in the hallway without an active pass:
+
+  * Staff should have a simple mechanism to **flag** this event (ex: quick “found without pass” action).
+  * This data is critical to reducing misuse (“black hole” effect) and driving cultural adoption.
+  * Proposed: add to staff UI a “Found Without Pass” button → generates log entry + optional flag.
+
+> **Note:** This feature is a **Phase 1.5+ enhancement candidate** (can be added easily after Phase 1 stable).
+
+---
+
+**Summary Statement:**
+
+**“The Eagle Hall Pass System is a student-driven transparency tool — not an enforcement or attendance system — designed to track hallway movement, build trust, and support interventions through data transparency, while respecting teacher autonomy and instructional time.”**
+
+---
+
+## 2. Core System Principles
+
+1. **One active pass per student**
+2. **Pass lifecycle is out-in cycle** (student must go OUT -> IN before any new OUT is allowed)
+3. **Responsibility is always clear:**
+
+   * When student is IN scheduled class, teacher of record owns responsibility.
+   * When student is OUT, originating teacher owns responsibility.
+   * When student is IN another destination, staff at destination owns responsibility.
+4. **Emergency mode elevates visibility and overrides normal autonomy.**
+5. **Admin can override any pass or autonomy setting.**
+6. **UI must match backend lifecycle exactly.**
+
+---
+
+## 3. Pass Lifecycle
+
+### States:
+
+* OPEN
+* CLOSED
+
+### Status:
+
+* OUT
+* IN
+
+### Leg:
+
+* Increments by 1 on each OUT -> IN transition.
+
+### Flow:
+
+1. **Open pass** (OUT) -> appears on Active Passes.
+2. **Student checks IN** to scheduled class or to destination.
+3. **OUT-IN cycle repeats if student requests another pass.**
+4. **Pass closes via:**
+
+   * Auto-close (period change)
+   * Teacher/admin manual close
+   * Emergency close
+   * Student check-IN to scheduled class (auto-close)
+
+### Special cases:
+
+* Restroom is a destination that can be selected but **cannot be checked IN to** — student must return to class after restroom.
+
+### Enforcement:
+
+* Student cannot go OUT to new destination unless IN first.
+* Admin override allows force-close + new pass.
+* Teachers can write pass for student (force-close old pass first).
+
+---
+
+## 4. Data Model Spec
+
+### General:
+
+* All sheet headers will be **lowerCamelCase**.
+* Backend will auto-normalize headers.
+* Backend will tolerate empty Active Passes and Pass Log.
+
+### Sheet Definitions:
+
+---
+
+#### Pass Log
+
+| Column    | Purpose           | Source |
+| --------- | ----------------- | ------ |
+| timestamp | Time of event     | system |
+| passId    | Unique pass ID    | system |
+| legId     | Current leg       | system |
+| studentId | Student ID        | system |
+| state     | OPEN/CLOSED       | system |
+| status    | OUT/IN            | system |
+| staffId   | Responsible staff | system |
+| destId    | Destination       | system |
+| flag      | Flags (LD etc)    | system |
+| notes     | Notes             | system |
+
+---
+
+#### Active Passes
+
+| Column         | Purpose                   | Source |
+| -------------- | ------------------------- | ------ |
+| passId         | Unique pass ID            | system |
+| studentId      | Student ID                | system |
+| originStaffId  | Staff who opened pass     | system |
+| currentStaffId | Current responsible staff | system |
+| destId         | Destination               | system |
+| legId          | Current leg               | system |
+| state          | OPEN                      | system |
+| status         | OUT/IN                    | system |
+| startTime      | Start timestamp           | system |
+
+---
+
+#### Permanent Record
+
+| Column        | Purpose               | Source |
+| ------------- | --------------------- | ------ |
+| passId        | Unique pass ID        | system |
+| studentId     | Student ID            | system |
+| startTime     | Start timestamp       | system |
+| endTime       | End timestamp         | system |
+| totalDuration | Minutes               | system |
+| originStaffId | Staff who opened pass | system |
+| destId        | Destination           | system |
+| legId         | Final leg             | system |
+| flag          | Flags                 | system |
+| notes         | Notes                 | system |
+
+---
+
+#### Student Data
+
+| Column       | Purpose                     | Source        |
+| ------------ | --------------------------- | ------------- |
+| studentId    | Unique ID                   | manual/import |
+| studentEmail | Email                       | manual/import |
+| firstName    | First name                  | derived       |
+| lastName     | Last name                   | derived       |
+| p1A-p4B      | Scheduled teacher (staffId) | manual/import |
+
+---
+
+#### Teacher Data
+
+| Column         | Purpose            | Source        |
+| -------------- | ------------------ | ------------- |
+| staffId        | Unique ID          | manual/import |
+| staffEmail     | Email              | manual/import |
+| firstName      | First name         | derived       |
+| lastName       | Last name          | derived       |
+| roomId         | Room ID            | manual        |
+| periodOverride | TRUE/FALSE         | manual        |
+| studentTo      | Autonomy           | manual        |
+| teacherTo      | Autonomy           | manual        |
+| studentFrom    | Autonomy           | manual        |
+| p1-p4          | Room ID (floaters) | manual        |
+
+---
+
+#### Support Data / Admin Data
+
+| Column         | Purpose               | Source          |
+| -------------- | --------------------- | --------------- |
+| staffId        | Unique ID             | manual/import   |
+| staffEmail     | Email                 | manual/import   |
+| firstName      | First name            | derived         |
+| lastName       | Last name             | derived         |
+| roomId         | Room ID               | manual          |
+| periodOverride | TRUE/FALSE            | manual          |
+| studentTo      | Autonomy              | manual          |
+| teacherTo      | Autonomy              | manual          |
+| studentFrom    | Always YES or omitted | system enforced |
+
+---
+
+#### Location Data
+
+| Column      | Purpose        | Source |
+| ----------- | -------------- | ------ |
+| roomId      | Room ID        | manual |
+| destId      | Label override | manual |
+| description | Description    | manual |
+
+---
+
+#### Bell Schedule
+
+| Column    | Purpose     | Source |
+| --------- | ----------- | ------ |
+| period    | Period      | manual |
+| startTime | Start time  | manual |
+| endTime   | End time    | manual |
+| dayType   | A/B/Special | manual |
+
+---
+
+#### Settings
+
+| Column       | Purpose     | Source |
+| ------------ | ----------- | ------ |
+| settingKey   | Key         | manual |
+| settingValue | Value       | manual |
+| description  | Description | manual |
+
+---
+
+## 5. Responsibility & Ownership Rules
+
+* **Scheduled class IN** → scheduled teacher owns.
+* **Pass OUT** → origin staff owns.
+* **IN other destination** → destination staff owns.
+* Admin can always force change ownership (force close + reopen).
+
+---
+
+## 6. Emergency Mode Behavior
+
+* Triggered manually by Admin or Dev.
+* While active:
+
+  * All staff see Emergency Panel.
+  * All staff can force check-IN students.
+  * Active passes and all IN locations are shown.
+  * Teacher ID used for responsibility on forced check-IN.
+* Only Admin/Dev can revert Emergency Mode.
+
+---
+
+## 7. Permission Enforcement Rules
+
+### Autonomy Triggers — Phase 1 Scope
+
+| Field       | Applies To              | Values |
+| ----------- | ----------------------- | ------ |
+| studentTo   | Teacher, Support, Admin | YES/NO |
+| teacherTo   | Teacher, Support, Admin | YES/NO |
+| studentFrom | Teacher only            | YES/NO |
+
+### Enforcement
+
+* If NO:
+
+  * **UI disables request button.**
+  * **UI shows message:** "This teacher is not accepting passes right now."
+* Admin always overrides.
+* Support treated as teacher for enforcement.
+
+### Notes
+
+* "Manual" flow is **NOT implemented in Phase 1** — planned for future phase.
+
+---
+
+## 8. Notifications
+
+The system must support real-time **notifications and messages** to ensure transparency and alignment between students, staff, and admin.
+
+### Notification Events
+
+| Event                                 | Recipient(s)                                        | Notification Action                                       |
+| ------------------------------------- | --------------------------------------------------- | --------------------------------------------------------- |
+| Admin override pass                   | Prior responsible staff                             | Immediate notification (UI + optional email)              |
+| Teacher writes pass for student       | Destination staff                                   | Immediate notification (UI + optional email)              |
+| Pass blocked by autonomy trigger      | Student                                             | UI message before pass submission                         |
+| Scheduled pass priority prevents pass | Student + staff attempting to write pass            | UI message ("Scheduled pass priority prevents new pass.") |
+| Emergency Mode activated              | All staff                                           | Immediate banner + Emergency Panel activated              |
+| Emergency Mode deactivated            | All staff                                           | Immediate banner removed, return to normal UI             |
+| Pass auto-closed (period change)      | Origin + destination staff (optional, configurable) | Log entry + optional notification                         |
+
+### Delivery Methods
+
+* **In-app UI messages**
+* **Admin-configurable email (optional)**
+
+---
+
+## 9. Staff UI Logic
+
+### Default Staff Panel (Teacher/Support/Admin)
+
+#### Normal Mode (non-emergency)
+
+| View               | Content                                                       |
+| ------------------ | ------------------------------------------------------------- |
+| Current OUT passes | All passes where currentStaffId matches staffId, status = OUT |
+| Current IN passes  | All passes where currentStaffId matches staffId, status = IN  |
+| Actions            | Write pass for student, force-close pass (if owned), see logs |
+
+### Emergency Mode
+
+* Emergency Panel visible to ALL STAFF
+* Shows:
+
+  * All students with OUT passes
+  * All students IN locations other than scheduled class
+  * Action: "Check student IN here" → assigns responsibility to staffId + current roomId
+  * Visual indicator: "Emergency Mode Active"
+
+### Special Case: Found Without Pass
+
+* Action Button: "Found Student Without Pass"
+
+  * Creates log entry with timestamp, studentId, staffId, location
+  * Optional flag: "Flag for Admin Review"
+  * Phase 1.5+ (optional)
+
+---
+
+## 10. Admin Hierarchy / Override Logic
+
+| Action                      | Who can perform                                      | Overrides                                                               |
+| --------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------------- |
+| Write pass for any student  | Admin                                                | Force-close current pass, if exists                                     |
+| Write pass for any student  | Teacher/Support                                      | Force-close current pass unless student has active Admin-scheduled pass |
+| Close pass manually         | Admin, Teacher/Support (if responsible)              | Always allowed                                                          |
+| Scheduled pass protection   | Admin passes cannot be overridden by Teacher/Support |                                                                         |
+| Emergency Mode activation   | Admin or Dev                                         | Immediate system-wide effect                                            |
+| Emergency Mode deactivation | Admin or Dev                                         | Only these roles can revert                                             |
+
+---
+
+## 11. Scheduled Pass Priority Handling
+
+### Scheduled Pass Definition
+
+* A pass approved in advance by Admin and marked as "Scheduled".
+
+### Enforcement
+
+* If student has active Scheduled pass:
+
+  * **Teachers/Support cannot write conflicting pass**
+  * UI notifies: "This student has an Admin scheduled pass in effect. Pass writing blocked."
+* Admin can override any pass.
+
+### Priority Levels
+
+| Level                        | Description                           |
+| ---------------------------- | ------------------------------------- |
+| Admin Scheduled Pass         | Highest priority, blocks other passes |
+| Teacher/Support written pass | Normal priority                       |
+| Student self-requested pass  | Normal priority                       |
+
+---
+
+## 12. Future Roadmap & Phase 1.5 Candidates
+
+### Phase 1.5 Candidates (for future iteration)
+
+* Full implementation of **manual approval flows** for autonomy triggers ("Manual")
+
+  * UI: pass goes into "Pending Approval" state
+  * Staff approval queue UI
+  * Expire after X minutes if unapproved
+  * Student cancel pending pass
+
+* **Found Without Pass quick logging**
+
+  * Staff panel: "Found Without Pass" → timestamped log + flag
+  * Analytics tracking for this data
+
+* **Admin Emergency Attendance / Check-In flow**
+
+  * During Emergency Mode:
+
+    * Staff can mark ALL students present in room
+    * Emergency attendance report
+
+* **Better floating teacher / multiple room support**
+
+  * Advanced logic for teachers who move rooms each period
+
+* **Import automation from SIS** (Infinite Campus)
+
+  * Automate student-teacher period assignment
+  * Auto-update staff data
+
+* **Dashboard analytics**
+
+  * Visual trends of hallway usage
+  * Identify frequent flyers, black holes
+
+* **Parent-facing transparency portal** (far future)
+
+---
+
+## FINAL NOTES
+
+The entire system should always:
+
+* **Mirror backend logic to frontend UI exactly** — no mismatches.
+* **Respect teacher autonomy first**.
+* **Place accountability on students first**.
+* **Provide clear logs for all actions.**
+* **Remain transparent and simple to use for staff.**
+
+---
+
+# ✅ END OF FULL DRAFT BACKEND SPEC
+
+
