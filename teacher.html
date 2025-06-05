@@ -3,100 +3,155 @@
   <head>
     <base target="_top">
     <title>Teacher Dashboard</title>
+    <link rel="stylesheet" href="common.css">
   </head>
-  <body>
-    <h1>Teacher Dashboard</h1>
-    <p>Welcome, <?= teacher.firstName ?> <?= teacher.lastName ?>.</p>
+  <body style="background:#F9F9F9;">
+    <div class="container">
+      <div class="card header" style="background:#00274C;color:#FFCB05;display:flex;justify-content:space-between;align-items:center;">
+        <div>
+          <h1 style="margin:0;">Teacher Dashboard</h1>
+          <div style="font-size:0.9rem;">
+            <span><?= teacher.firstName ?> <?= teacher.lastName ?></span>
+            <span style="margin-left:8px;">Room <?= teacher.primaryRoom ?></span>
+            <span style="margin-left:8px;">Period <?= teacher.currentPeriod ?></span>
+          </div>
+        </div>
+        <span id="settings-gear" class="icon-gear" style="cursor:pointer;margin-left:10px;"></span>
+      </div>
 
-    <h2>Current Class</h2>
-    <table id="student-table" border="1">
-      <thead>
-        <tr><th>Student</th><th>Action</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+      <div id="settings-panel" class="card" style="display:none;">
+        <label style="display:block;"><input id="toggle-student" type="checkbox"> Allow Student Requests</label>
+        <label style="display:block;"><input id="toggle-teacher" type="checkbox"> Allow Teacher Requests</label>
+        <label style="display:block;"><input id="toggle-destination" type="checkbox"> Allow Destination Requests</label>
+      </div>
 
-    <h2>Active Passes</h2>
-    <table id="active-table" border="1">
-      <thead>
-        <tr><th>Student</th><th>Status</th><th>Destination</th><th>Action</th></tr>
-      </thead>
-      <tbody></tbody>
-    </table>
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;" class="card filters">
+        <button id="refresh-button" type="button" class="btn-secondary">Manual Refresh</button>
+        <input id="student-search" type="text" placeholder="Lookup by name or ID/email" style="flex:1;">
+      </div>
 
+      <div id="active-container" class="grid"></div>
+
+      <div id="search-results" class="dropdown" style="display:none;"></div>
+      <div id="lookup-card"></div>
+    </div>
+
+    <script src="common.js"></script>
     <script>
-      const CSRF_TOKEN = '<?= csrfToken ?>';
-      function renderStudents(list) {
-        var tbody = document.getElementById('student-table').querySelector('tbody');
-        tbody.innerHTML = '';
-        list.forEach(function(s) {
-          var tr = document.createElement('tr');
-          var nameTd = document.createElement('td');
-          nameTd.textContent = s.firstName + ' ' + s.lastName;
-          var actionTd = document.createElement('td');
-          var btn = document.createElement('button');
-          btn.textContent = 'Open Pass';
-          btn.onclick = function() {
-            var dest = prompt('Destination ID');
-            if (!dest) return;
-            var body = {
-              action: 'openPass',
-              studentID: s.studentID,
-              destinationID: dest,
-              notes: '',
-              csrfToken: CSRF_TOKEN
-            };
-            google.script.run.withSuccessHandler(fetchActivePasses)
-              .doPost({ postData: { contents: JSON.stringify(body) } });
-          };
-          actionTd.appendChild(btn);
-          tr.appendChild(nameTd);
-          tr.appendChild(actionTd);
-          tbody.appendChild(tr);
-        });
-      }
-
+      const teacherID = '<?= teacher.staffID ?>';
       function renderActivePasses(list) {
-        var tbody = document.getElementById('active-table').querySelector('tbody');
-        tbody.innerHTML = '';
-        list.forEach(function(p) {
-          var tr = document.createElement('tr');
-          var studentTd = document.createElement('td');
-          studentTd.textContent = p.studentName;
-          var statusTd = document.createElement('td');
-          statusTd.textContent = p.status;
-          var destTd = document.createElement('td');
-          destTd.textContent = p.destinationID;
-          var actionTd = document.createElement('td');
-          var closeBtn = document.createElement('button');
-          closeBtn.textContent = 'Close Pass';
-          closeBtn.onclick = function() {
-            var body = { action: 'closePass', passID: p.passID, csrfToken: CSRF_TOKEN };
-            google.script.run.withSuccessHandler(fetchActivePasses)
-              .doPost({ postData: { contents: JSON.stringify(body) } });
-          };
-          actionTd.appendChild(closeBtn);
-          tr.appendChild(studentTd);
-          tr.appendChild(statusTd);
-          tr.appendChild(destTd);
-          tr.appendChild(actionTd);
-          tbody.appendChild(tr);
+        var container = document.getElementById('active-container');
+        container.innerHTML = '';
+        list.forEach(function(p){
+          if(p.status === 'IN') return; // exclude inbound
+          var card = document.createElement('div');
+          card.className = 'card pass-card';
+          card.setAttribute('data-pass-id', p.passID);
+          var html = '<h3><strong>' + p.studentName + '</strong></h3>' +
+                     '<p>Destination: ' + p.destination + '</p>' +
+                     '<p>Out: ' + p.timeOut + '</p>' +
+                     '<button id="return-' + p.passID + '" type="button" class="btn-primary">Mark Returned</button>';
+          card.innerHTML = html;
+          container.appendChild(card);
+          var btn = document.getElementById('return-' + p.passID);
+          btn.addEventListener('click', function(){
+            btn.disabled = true;
+            showSpinner('return-' + p.passID);
+            google.script.run.withSuccessHandler(function(){
+              hideSpinner('return-' + p.passID);
+              card.classList.add('returned');
+              btn.textContent = 'Returned';
+            }).updatePassStatus(p.passID, 'IN', teacherID);
+          });
         });
       }
 
-      function fetchStudents() {
-        google.script.run.withSuccessHandler(renderStudents)
-          .getStudentsForTeacherCurrentPeriod('<?= teacher.staffID ?>');
+      function refreshActiveList(){
+        var btn = document.getElementById('refresh-button');
+        if(btn){ btn.disabled = true; showSpinner('refresh-button'); }
+        google.script.run.withSuccessHandler(function(list){
+          if(btn){ hideSpinner('refresh-button'); btn.disabled = false; }
+          renderActivePasses(list);
+        }).getActivePassesByRoom(teacherID, '<?= teacher.primaryRoom ?>', '<?= teacher.currentPeriod ?>');
       }
 
-      function fetchActivePasses() {
-        google.script.run.withSuccessHandler(renderActivePasses)
-          .getActivePassesForTeacher('<?= teacher.staffID ?>');
+      document.getElementById('settings-gear').addEventListener('click', function(){
+        var panel = document.getElementById('settings-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+      });
+
+      document.getElementById('refresh-button').addEventListener('click', refreshActiveList);
+
+      var searchInput = document.getElementById('student-search');
+      var searchTimer;
+      searchInput.addEventListener('keyup', function(){
+        clearTimeout(searchTimer);
+        searchTimer = setTimeout(function(){
+          var q = searchInput.value.trim();
+          var list = document.getElementById('search-results');
+          if(!q){ list.style.display='none'; list.innerHTML=''; return; }
+          google.script.run.withSuccessHandler(renderLookupResults).getStudentByLookup(q);
+        },300);
+      });
+
+      function renderLookupResults(results){
+        var list = document.getElementById('search-results');
+        list.innerHTML='';
+        results.slice(0,5).forEach(function(s){
+          var item = document.createElement('div');
+          item.className = 'dropdown-item';
+          item.setAttribute('data-student-id', s.studentID);
+          item.textContent = s.firstName + ' ' + s.lastName + ' (' + s.studentID + ')';
+          list.appendChild(item);
+        });
+        list.style.display = results.length ? 'block' : 'none';
       }
 
-      fetchStudents();
-      fetchActivePasses();
-      setInterval(fetchActivePasses, 30000);
+      var selectedStudentName = '';
+      document.getElementById('search-results').addEventListener('click', function(e){
+        if(e.target.classList.contains('dropdown-item')){
+          var id = e.target.getAttribute('data-student-id');
+          selectedStudentName = e.target.textContent;
+          searchInput.value = '';
+          this.innerHTML='';
+          this.style.display='none';
+          google.script.run.withSuccessHandler(renderLookupCard).getCurrentStudentPass(id);
+        }
+      });
+
+      function renderLookupCard(pass){
+        var container = document.getElementById('lookup-card');
+        container.innerHTML='';
+        var card = document.createElement('div');
+        card.className = 'card lookup-card';
+        var html = '<h3>' + selectedStudentName + '</h3>';
+        if(!pass){
+          html += '<p>No Active Pass</p>';
+        } else if(pass.status === 'OUT') {
+          html += '<p>OUT to ' + pass.destination + ' since ' + pass.timeOut + '</p>' +
+                   '<button id="lookup-return-' + pass.passID + '" type="button" class="btn-primary">Mark Returned</button>';
+        } else {
+          html += '<p>IN since ' + pass.timeIn + '</p>';
+        }
+        card.innerHTML = html;
+        container.appendChild(card);
+        if(pass && pass.status === 'OUT'){
+          var btn = document.getElementById('lookup-return-' + pass.passID);
+          btn.addEventListener('click', function(){
+            btn.disabled = true;
+            showSpinner('lookup-return-' + pass.passID);
+            google.script.run.withSuccessHandler(function(){
+              hideSpinner('lookup-return-' + pass.passID);
+              card.classList.add('returned');
+              btn.textContent = 'Returned';
+              refreshActiveList();
+            }).updatePassStatus(pass.passID, 'IN', teacherID);
+          });
+        }
+      }
+
+      refreshActiveList();
+      setInterval(refreshActiveList, 60000);
     </script>
   </body>
 </html>
