@@ -133,6 +133,29 @@ function getCurrentStudentPass(studentID) {
   return null;
 }
 
+/**
+ * Get current student pass with caching
+ * @param {string} studentID - Student ID to lookup
+ * @returns {Object|null} Pass object or null
+ */
+function getCurrentStudentPassOptimized(studentID) {
+  const cacheKey = 'STUDENT_PASS_' + studentID;
+  const cached = getCachedData(cacheKey);
+  if (cached) {
+    return cached;
+  }
+
+  const pass = getCurrentStudentPass(studentID);
+
+  const cache = PropertiesService.getScriptProperties();
+  cache.setProperty(
+    CACHE_KEY_PREFIX + cacheKey,
+    JSON.stringify({ value: pass, expireAt: Date.now() + 30 * 1000 })
+  );
+
+  return pass;
+}
+
 function getAllActivePasses() {
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
@@ -165,7 +188,8 @@ function getAllActivePasses() {
  * @throws {Error} If system is in emergency mode
  */
 function openPass(studentID, originStaffID, destinationID, notes) {
-  try {
+  return monitorPerformance('openPass', () => {
+    try {
     // Prevent pass changes if emergency mode is enabled
     checkEmergencyMode();
     const sheet = getSheet(ACTIVE_PASSES_SHEET);
@@ -198,8 +222,10 @@ function openPass(studentID, originStaffID, destinationID, notes) {
     ];
     
     // Use setValues instead of appendRow to preserve formatting
-    const lastRow = sheet.getLastRow() + 1;
-    sheet.getRange(lastRow, 1, 1, row.length).setValues([row]);
+    retrySheetOperation(() => {
+      const lastRow = sheet.getLastRow() + 1;
+      sheet.getRange(lastRow, 1, 1, row.length).setValues([row]);
+    });
 
     appendPassLog({
       timestamp: nowIso,
@@ -213,16 +239,18 @@ function openPass(studentID, originStaffID, destinationID, notes) {
       flag: '',
       notes: safeNotes
     });
-    invalidateActivePassesCache(); // Clear cache after modification
+    invalidateSmartCache('open', studentID);
     return passID;
   } catch (err) {
     Logger.log(err.stack || err.message);
     throw err;
   }
+  });
 }
 
 function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
-  try {
+  return monitorPerformance('updatePassStatus', () => {
+    try {
     // Prevent pass changes if emergency mode is enabled
     checkEmergencyMode();
     const sheet = getSheet(ACTIVE_PASSES_SHEET);
@@ -290,15 +318,17 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
       flag: finalFlag,
       notes: safeNotes
     });
-    invalidateActivePassesCache(); // Clear cache after modification
+    invalidateSmartCache('update', row[1]);
   } catch (err) {
     Logger.log(err.stack || err.message);
     throw err;
   }
+  });
 }
 
 function closePass(passID, closingStaffID, flag, notes) {
-  try {
+  return monitorPerformance('closePass', () => {
+    try {
     // Prevent pass changes if emergency mode is enabled
     checkEmergencyMode();
     const sheet = getSheet(ACTIVE_PASSES_SHEET);
@@ -356,11 +386,12 @@ function closePass(passID, closingStaffID, flag, notes) {
     ]]);
 
     sheet.deleteRow(rowIndex);
-    invalidateActivePassesCache(); // Clear cache after modification
+    invalidateSmartCache('close', row[1]);
   } catch (err) {
     Logger.log(err.stack || err.message);
     throw err;
   }
+  });
 }
 
 function autoClosePasses() {
@@ -458,9 +489,108 @@ function getActivePassesData() {
 /**
  * Invalidate active passes cache when data changes
  */
-function invalidateActivePassesCache() {
+/**
+ * Smart cache invalidation - only invalidate what changed
+ * @param {string} operation - Type of operation performed
+ * @param {string} studentID - Student ID if relevant
+ */
+function invalidateSmartCache(operation, studentID = null) {
   const cache = PropertiesService.getScriptProperties();
+
   cache.deleteProperty(CACHE_KEY_PREFIX + 'ACTIVE_PASSES_DATA');
+
+  if (studentID) {
+    cache.deleteProperty(CACHE_KEY_PREFIX + 'STUDENT_PASS_' + studentID);
+  }
+
+  if (operation === 'open' || operation === 'close') {
+    const keys = cache.getKeys();
+    keys.forEach(key => {
+      if (key.startsWith(CACHE_KEY_PREFIX + 'TEACHER_PASSES_')) {
+        cache.deleteProperty(key);
+      }
+    });
+  }
+}
+
+/**
+ * Batch sheet operations to reduce API calls
+ * @param {GoogleAppsScript.Spreadsheet.Sheet} sheet - Target sheet
+ * @param {Array} operations - Array of {type: 'append'|'update'|'delete', data: any, range?: string}
+ */
+function batchSheetOperations(sheet, operations) {
+  const updates = [];
+  const appends = [];
+
+  operations.forEach(op => {
+    if (op.type === 'append') {
+      appends.push(op.data);
+    } else if (op.type === 'update') {
+      updates.push({ range: op.range, values: op.data });
+    }
+  });
+
+  if (appends.length > 0) {
+    const startRow = sheet.getLastRow() + 1;
+    sheet.getRange(startRow, 1, appends.length, appends[0].length).setValues(appends);
+  }
+
+  if (updates.length > 0) {
+    updates.forEach(update => {
+      sheet.getRange(update.range).setValues(update.values);
+    });
+  }
+
+  return;
+}
+
+/**
+ * Retry wrapper for sheet operations that might fail due to rate limits
+ * @param {Function} operation - Function to retry
+ * @param {number} maxRetries - Maximum retry attempts
+ * @param {number} baseDelay - Base delay in milliseconds
+ * @returns {*} Result of the operation
+ */
+function retrySheetOperation(operation, maxRetries = 3, baseDelay = 1000) {
+  let lastError;
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return operation();
+    } catch (error) {
+      lastError = error;
+      if (error instanceof PassValidationError || error instanceof PassNotFoundError) {
+        throw error;
+      }
+      const delay = baseDelay * Math.pow(2, attempt);
+      Logger.log(`Sheet operation failed (attempt ${attempt + 1}/${maxRetries}), retrying in ${delay}ms: ${error.message}`);
+      if (attempt < maxRetries - 1) {
+        Utilities.sleep(delay);
+      }
+    }
+  }
+  throw new Error(`Sheet operation failed after ${maxRetries} attempts: ${lastError.message}`);
+}
+
+/**
+ * Performance monitoring wrapper
+ * @param {string} operationName - Name of the operation
+ * @param {Function} operation - Function to monitor
+ * @returns {*} Result of the operation
+ */
+function monitorPerformance(operationName, operation) {
+  const startTime = Date.now();
+  try {
+    const result = operation();
+    const duration = Date.now() - startTime;
+    if (duration > 2000) {
+      Logger.log(`SLOW OPERATION: ${operationName} took ${duration}ms`);
+    }
+    return result;
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    Logger.log(`FAILED OPERATION: ${operationName} failed after ${duration}ms: ${error.message}`);
+    throw error;
+  }
 }
 
 // ADD these batch operation functions:
