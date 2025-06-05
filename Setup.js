@@ -13,9 +13,9 @@ function onOpen() {
 function setupSystem() {
   const ss = getSpreadsheet();
   const requiredSheets = [
-    PASS_LOG_SHEET,
-    ACTIVE_PASSES_SHEET,
-    PERMANENT_RECORD_SHEET,
+    SHEETS.PASS_LOG,
+    SHEETS.ACTIVE_PASSES,
+    SHEETS.PERMANENT_RECORD,
     SHEETS.STUDENTS,
     SHEETS.TEACHERS,
     SHEETS.SUPPORT,
@@ -96,7 +96,7 @@ function seedDemoData() {
 
   const sheetConfigs = [
     {
-      name: PASS_LOG_SHEET,
+      name: SHEETS.PASS_LOG,
       headers: [
         'timestamp',
         'passID',
@@ -111,7 +111,7 @@ function seedDemoData() {
       ]
     },
     {
-      name: ACTIVE_PASSES_SHEET,
+      name: SHEETS.ACTIVE_PASSES,
       headers: [
         'passID',
         'studentID',
@@ -125,7 +125,7 @@ function seedDemoData() {
       ]
     },
     {
-      name: PERMANENT_RECORD_SHEET,
+      name: SHEETS.PERMANENT_RECORD,
       headers: [
         'passID',
         'studentID',
