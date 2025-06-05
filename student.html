@@ -3,26 +3,95 @@
   <head>
     <base target="_top">
     <title>Student Dashboard</title>
+    <link rel="stylesheet" href="common.css">
   </head>
   <body>
-    <h1>Student Dashboard</h1>
-    <p>Welcome, <?= student.firstName ?> <?= student.lastName ?>.</p>
-    <div id="pass-state">Current Pass: <span id="pass-state-text">Loading...</span></div>
+    <div class="container">
+      <h1>Student Dashboard</h1>
+      <p>Welcome, <?= student.firstName ?> <?= student.lastName ?>.</p>
 
+      <div class="card" id="card-pass-status">
+        <span id="pass-state-text">Loading...</span>
+      </div>
+
+      <div class="card" id="card-pass-action"></div>
+    </div>
+
+    <footer class="footer">
+      <small><em>Ashley High School</em></small>
+    </footer>
+
+    <script src="common.js"></script>
     <script>
       const CSRF_TOKEN = '<?= csrfToken ?>';
+
       function updatePassState(pass) {
         var text = document.getElementById('pass-state-text');
         if (!pass) {
-          text.textContent = 'No pass';
+          text.textContent = 'No active pass';
+          renderRequestForm();
           return;
         }
         text.textContent = pass.status === 'OUT' ? 'Pass OUT' : 'Pass IN';
+        renderCloseCard(pass.passID);
       }
 
       function fetchPassState() {
-        google.script.run.withSuccessHandler(updatePassState)
+        google.script.run
+          .withSuccessHandler(updatePassState)
           .getCurrentStudentPass('<?= student.studentID ?>');
+      }
+
+      function renderRequestForm() {
+        var card = document.getElementById('card-pass-action');
+        card.style.opacity = 0;
+        setTimeout(function() {
+          card.innerHTML =
+            '<select id="destination-select">' +
+            '<option value="CLASSROOM">CLASSROOM</option>' +
+            '<option value="RESTROOM">RESTROOM</option>' +
+            '<option value="LIBRARY">LIBRARY</option>' +
+            '<option value="OFFICE">OFFICE</option>' +
+            '</select>' +
+            '<br>' +
+            '<button id="request-button" type="button" class="btn-primary">Request Pass</button>';
+          card.style.opacity = 1;
+          document.getElementById('request-button').onclick = function() {
+            var requestBtn = document.getElementById('request-button');
+            requestBtn.disabled = true;
+            showSpinner('request-button');
+            var destination = document.getElementById('destination-select').value;
+            google.script.run
+              .withSuccessHandler(function(pass) {
+                hideSpinner('request-button');
+                updatePassState(pass);
+                renderCloseCard(pass.passID);
+              })
+              .requestPass('<?= student.studentID ?>', destination);
+          };
+        }, 300);
+      }
+
+      function renderCloseCard(passID) {
+        var card = document.getElementById('card-pass-action');
+        card.style.opacity = 0;
+        setTimeout(function() {
+          card.innerHTML =
+            '<button id="close-button" type="button" class="btn-primary">Close Pass</button>';
+          card.style.opacity = 1;
+          document.getElementById('close-button').onclick = function() {
+            var closeBtn = document.getElementById('close-button');
+            closeBtn.disabled = true;
+            showSpinner('close-button');
+            google.script.run
+              .withSuccessHandler(function(pass) {
+                hideSpinner('close-button');
+                updatePassState(null);
+                renderRequestForm();
+              })
+              .closePass(passID);
+          };
+        }, 300);
       }
 
       fetchPassState();
