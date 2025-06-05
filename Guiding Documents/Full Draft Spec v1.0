@@ -434,6 +434,15 @@ The system must support real-time **notifications and messages** to ensure trans
   * Visual trends of hallway usage
   * Identify frequent flyers, black holes
 
+* **Dynamic Restroom Routing**:
+
+  * Future enhancement
+  * Restroom destination will dynamically route to appropriate nearby restroom **based on current location**:
+
+    * Logic will derive from origin roomId → match building zone (example: room 805 → "800" zone restroom)
+  * Requires additional backend logic & location mapping
+  * Target Phase 1.5+
+
 * **Parent-facing transparency portal** (far future)
 
 ---
@@ -452,4 +461,1042 @@ The entire system should always:
 
 # ✅ END OF FULL DRAFT BACKEND SPEC
 
+
+## 13. Student UI Spec
+
+---
+
+### 13.1 Purpose
+
+The Student UI is the **primary interface for students** to:
+
+* **Request hall passes**
+* **Check into destinations**
+* **Check back into their scheduled class**
+* **View current pass status and personal info**
+
+The UI is intentionally **simple, mobile-first**, and designed to place **full responsibility on the student**.
+
+It is not a discipline or enforcement UI.
+
+---
+
+### 13.2 Design Philosophy
+
+* **Student-driven** — all actions initiated by student
+* **Mobile-first** — optimized for phones, fast interaction
+* **Minimal taps** — each action should take 1-2 taps max
+* **No confusing choices** — UI should always clearly show "what can I do now?"
+* **Responsive to backend state** — cannot present illegal options
+
+---
+
+### 13.3 Core Flows
+
+#### Flow A — Student IN Scheduled Class
+
+| Display                  | Action                                   |
+| ------------------------ | ---------------------------------------- |
+| Current Period           | Shows period (ex: P2A)                   |
+| Scheduled Class          | Shows teacher lastName + roomId          |
+| Current Status           | No Active Pass                           |
+| Actions:                 |                                          |
+| 1️⃣ Restroom button      | Opens pass for restroom (OUT)            |
+| 2️⃣ Destination dropdown | List of locations (from Location Data)   |
+| 3️⃣ Request Pass button  | Opens pass to selected destination (OUT) |
+
+#### Flow B — Student OUT (In Hallway)
+
+| Display                                                           | Action                           |
+| ----------------------------------------------------------------- | -------------------------------- |
+| Current Period                                                    | Shows period                     |
+| Scheduled Class                                                   | Shows teacher + roomId           |
+| Current Pass                                                      | Shows destId / location going to |
+| Current Status                                                    | OUT                              |
+| Actions:                                                          |                                  |
+| 1️⃣ "I am back in Scheduled Class (teacher + roomId)" button      | Checks IN to scheduled class     |
+| 2️⃣ "Check In at Destination (teacher + roomId or destId)" button | Checks IN to destination         |
+
+**Order:** "Back in Scheduled Class" button appears **above** "Check In at Destination".
+
+#### Flow C — Student IN Other Destination
+
+| Display                                | Action                                      |
+| -------------------------------------- | ------------------------------------------- |
+| Current Period                         | Shows period                                |
+| Scheduled Class                        | Shows teacher + roomId                      |
+| Current Location                       | IN destination (teacher + roomId or destId) |
+| Current Status                         | IN                                          |
+| Actions:                               |                                             |
+| Same as Flow A                         |                                             |
+| 1️⃣ Restroom button (always available) |                                             |
+| 2️⃣ Destination dropdown               |                                             |
+| 3️⃣ Request Pass button                |                                             |
+
+**Important:**
+
+* Flow C is **not IN-to-IN** — student must go OUT again before IN somewhere else.
+* UI presents Flow A style to enforce OUT-IN loop.
+
+---
+
+### 13.4 Visual Display — Always Visible
+
+| Field                              | Visible in All Flows |
+| ---------------------------------- | -------------------- |
+| Student name                       | YES                  |
+| Current Period                     | YES                  |
+| Scheduled Class (teacher + roomId) | YES                  |
+| Current Status (OUT/IN)            | YES                  |
+| Current Pass ID                    | YES                  |
+
+---
+
+### 13.5 UI Actions — Behavior
+
+| Action                    | Behavior                                                |
+| ------------------------- | ------------------------------------------------------- |
+| Request Pass              | Checks for autonomy triggers; if blocked, shows message |
+| Restroom Pass             | Always allowed if autonomy permits                      |
+| Check In Destination      | Allowed only if OUT                                     |
+| Return to Scheduled Class | Allowed only if OUT                                     |
+| Emergency Mode Active     | UI changes to locked state                              |
+
+---
+
+### 13.6 Error/Feedback States
+
+| Scenario                     | UI Feedback                                                                          |
+| ---------------------------- | ------------------------------------------------------------------------------------ |
+| Autonomy trigger blocks pass | "Pass request blocked by teacher settings."                                          |
+| Scheduled pass prevents pass | "An Admin scheduled pass takes priority."                                            |
+| Invalid state transition     | "Cannot perform this action right now."                                              |
+| Multiple tap prevention      | "Please wait... processing request." overlay shown                                   |
+| Emergency Mode On            | Banner: "Emergency Mode Active"; student actions disabled except check IN with staff |
+
+---
+
+### 13.7 Responsiveness & Mobile Support
+
+* **Optimized for phones** — primary use case
+* **Single-column layout**
+* **Large tap targets**
+* **Minimal scrolling**
+* **Text scaling supported**
+* **Offline friendly** (basic caching)
+* **Loading overlays** for slow GAS responses
+
+---
+
+### 13.8 Special Cases
+
+#### Restroom
+
+* Treated as a normal destination in dropdown
+* **Cannot check IN** to restroom
+* Return target:
+
+  * If pass originated from Scheduled Class (Flow A) → return to Scheduled Class
+  * If pass originated from IN destination (Flow C) → return to current IN destination (prior IN leg of current pass)
+
+#### Emergency Mode
+
+* Student cannot request new pass
+* Student cannot check IN to destination
+* Only visible action: "Check IN with staff" if directed
+* Emergency banner visible at top
+
+---
+
+### 13.9 Limitations — Intentional
+
+* No pass deletion/cancellation by student (Phase 2 feature)
+* No pass self-close beyond IN actions
+* No "schedule pass for later"
+* No timers shown to students
+* No dashboard analytics on Student UI
+
+---
+
+## ✅ END OF STUDENT UI SPEC — FULL DRAFT
+
+---
+
+## 14. Staff UI Spec
+
+---
+
+### 14.1 Purpose
+
+The Staff UI provides staff with **visibility and control** over hall pass state for their students.
+
+Goals:
+
+* **Transparency** — see current OUT and IN students
+* **Accountability** — staff can take or transfer responsibility
+* **Autonomy** — teachers control how their room interacts with the pass system
+* **Simplicity** — easy to use on mobile or desktop
+
+---
+
+### 14.2 Design Philosophy
+
+* **Teacher autonomy first** — staff only interact with their own areas unless granted higher access
+* **Student-driven** — staff do not have to actively manage passes unless they choose to
+* **Minimize classroom disruption** — UI is passive unless staff takes action
+* **Respect backend logic** — UI must not allow illegal actions
+
+---
+
+### 14.3 Staff Roles
+
+| Role    | Access Level                                                                       |
+| ------- | ---------------------------------------------------------------------------------- |
+| Teacher | Manage passes for their own scheduled classes and room(s)                          |
+| Support | Manage passes for their assigned spaces (support rooms, common areas)              |
+| Admin   | Full access — view and manage all passes, override any pass, manage Emergency Mode |
+
+---
+
+### 14.4 Normal Mode — Views & Actions
+
+#### Default Staff Panel
+
+| View               | Content                                                            |
+| ------------------ | ------------------------------------------------------------------ |
+| Current OUT passes | All passes where currentStaffId matches staffId, status = OUT      |
+| Current IN passes  | All passes where currentStaffId matches staffId, status = IN       |
+| Actions            | Write pass for student, force-close pass (if owned), see pass logs |
+
+#### Write New Pass (Teacher/Support/Admin)
+
+| Action             | Behavior                                                                                          |
+| ------------------ | ------------------------------------------------------------------------------------------------- |
+| Select Student     | Dropdown or search                                                                                |
+| Select Destination | Dropdown (respects autonomy triggers)                                                             |
+| Submit             | If student has current pass → force close (unless Admin Scheduled pass blocks) and write new pass |
+| Notifications      | Trigger appropriate UI messages as needed                                                         |
+
+#### Force Close
+
+| Action                        | Who can do            |
+| ----------------------------- | --------------------- |
+| Force close any pass they own | Teacher/Support/Admin |
+| Force close any pass          | Admin only            |
+
+#### Found Without Pass (Phase 1.5+)
+
+\| Action | Button to log "Found Without Pass" |
+\| Fields | Student ID, location, timestamp, optional flag |
+
+---
+
+### 14.5 Emergency Mode — Views & Actions
+
+#### Emergency Activation
+
+| Action                    | Who can do     |
+| ------------------------- | -------------- |
+| Activate Emergency Mode   | Admin/Dev only |
+| Deactivate Emergency Mode | Admin/Dev only |
+
+#### Emergency Panel (Visible to all staff once active)
+
+| View                           | Content                                                           |
+| ------------------------------ | ----------------------------------------------------------------- |
+| All OUT passes                 | All students OUT                                                  |
+| All IN but not scheduled class | All students IN to other destinations                             |
+| Actions                        | "Check student IN here" → assigns staffId + roomId responsibility |
+| Emergency banner               | Shown at top of UI                                                |
+
+#### Behavior Notes
+
+* Once Emergency Mode is active:
+
+  * **All staff see Emergency Panel**
+  * All staff can "check IN" students to themselves
+  * Only Admin/Dev can deactivate Emergency Mode
+  * **IMPORTANT:** In any real emergency, real-life actions and student safety take priority over system use.
+
+---
+
+### 14.6 Special Cases
+
+#### Found Without Pass
+
+* Teachers or Support can log "Found Without Pass" (Phase 1.5)
+* Creates log entry for accountability and tracking
+
+#### Force Overwrite
+
+* Writing a new pass always force-closes old pass **unless blocked by Admin Scheduled pass**
+* Admin can override even Scheduled passes
+
+#### Floating Teachers / Multiple Rooms
+
+* Teachers with periodOverride / multiple roomIDs see correct current room context
+* UI respects these settings dynamically
+
+---
+
+### 14.7 Notifications & Feedback
+
+| Event                            | Recipient(s)            | UI Feedback                                  |
+| -------------------------------- | ----------------------- | -------------------------------------------- |
+| Admin overrides pass             | Prior responsible staff | Immediate UI message                         |
+| Teacher writes pass for student  | Destination staff       | Immediate UI message                         |
+| Pass blocked by autonomy trigger | Staff                   | Immediate message "Pass blocked by settings" |
+| Scheduled pass prevents pass     | Staff                   | "Admin Scheduled pass in effect" message     |
+| Emergency Mode activated         | All staff               | Banner + Emergency Panel shown               |
+| Emergency Mode deactivated       | All staff               | Banner removed, normal UI restored           |
+
+---
+
+### 14.8 Limitations
+
+* Staff cannot:
+
+  * Delete pass logs
+  * Alter timestamps
+  * Remove Found Without Pass logs
+* Teachers/Support cannot override Admin Scheduled passes
+* Teachers/Support cannot deactivate Emergency Mode
+
+---
+
+### 14.9 Future Roadmap (Phase 1.5+)
+
+* Full Found Without Pass logging with analytics
+* Full manual approval queue for autonomy triggers ("Manual")
+
+  * Approval UI
+  * Expire unapproved passes after X minutes
+* Staff "quick override" button with required justification field
+* Improved Emergency "present with me" flows
+
+  * Staff can quickly mark students as "present with me" (NOT attendance)
+  * Designed to support real-time emergency situational awareness
+* Automated SIS sync to handle floating teacher roomIDs and other staff/student data fields
+* Richer staff dashboards (hallway heatmaps, trends)
+* Pass hierarchy refinement matrix (Phase 2)
+
+  * More granular priority between types of scheduled passes (ex: Guidance Counselor outranks Teacher)
+
+---
+
+### 14.10 Pass Hierarchy & Precedence
+
+To ensure predictable and fair behavior, the system enforces the following hierarchy:
+
+| Level | Priority                                                    |
+| ----- | ----------------------------------------------------------- |
+| 1     | Admin actions (manual passes, force closes, Emergency Mode) |
+| 2     | Admin Scheduled passes                                      |
+| 3     | Support Scheduled passes                                    |
+| 4     | Teacher Scheduled passes                                    |
+| 5     | Non-scheduled passes written by Admin                       |
+| 6     | Non-scheduled passes written by Support                     |
+| 7     | Non-scheduled passes written by Teacher                     |
+| 8     | Student self-requested passes (if allowed)                  |
+
+Rules:
+
+* **Scheduled passes always take precedence over non-scheduled passes**
+* **Support Scheduled outranks Teacher Scheduled**
+* **Admin can override any pass**
+* When a pass is blocked or overridden, UI notifications are sent to affected staff
+* Phase 2: additional hierarchy refinement matrix may be introduced (ex: Guidance outranks General Support)
+
+---
+
+## 👉 END OF STAFF UI SPEC — FULL DRAFT (UPDATED)
+
+---
+
+## 15. Admin UI Spec
+
+---
+
+### 15.1 Purpose
+
+The Admin UI provides **full system visibility and control** for administrators.
+
+Goals:
+
+* **Oversight** — view all current pass activity and student states
+* **Control** — ability to manage any pass, anywhere
+* **Intervention** — respond to misuse or urgent needs
+* **Crisis management** — activate and manage Emergency Mode
+* **Support other staff** — resolve issues that cannot be handled at teacher/support level
+
+---
+
+### 15.2 Design Philosophy
+
+* **Full visibility** — admins can see ALL data, past and present
+* **Override authority** — admins can take control over any pass or flow
+* **Consistency** — Admin actions respect same backend logic as other roles
+* **Transparency** — Admin actions trigger notifications to affected staff
+* **Crisis readiness** — Emergency Mode tools are central to admin view
+
+---
+
+### 15.3 Admin Roles
+
+| Role                   | Access                                                       |
+| ---------------------- | ------------------------------------------------------------ |
+| Admin (standard)       | Full access to all passes, logs, settings                    |
+| Admin (Emergency Mode) | Additional tools for managing Emergency Mode                 |
+| Dev                    | Same as Admin with elevated privileges for system management |
+
+---
+
+### 15.4 Normal Mode — Views & Actions
+
+#### Default Admin Panel
+
+| View                               | Content                                               |
+| ---------------------------------- | ----------------------------------------------------- |
+| Current OUT passes                 | All students with OUT passes (all staff)              |
+| Current IN but not scheduled class | All students IN to other destinations                 |
+| Scheduled passes                   | View and manage scheduled passes                      |
+| Found Without Pass logs            | View and manage FWP entries                           |
+| Settings panel                     | Manage system-wide settings (with safety checks)      |
+| Actions                            | Write pass, force-close pass, manage scheduled passes |
+
+#### Pass Visibility Hierarchy (Admin Panel)
+
+To ensure **priority visibility and triage**, passes are displayed in the following order:
+
+1️⃣ **OUT passes** — sorted by **elapsed duration** (longest OUT first)
+
+* Passes > 20 min
+* Passes > 10 min
+* Passes < 10 min
+
+2️⃣ **"In-Hallway" OUT passes** (destinationID is Restroom or hallway-like destinations)
+
+* Sorted by **elapsed duration**
+
+3️⃣ **IN to destination (not scheduled class)**
+
+* Sorted by **elapsed time since check-in** (newest check-ins on top)
+
+4️⃣ **Scheduled passes**
+
+* Upcoming passes sorted by start time
+* Active Scheduled passes sorted by elapsed time
+
+5️⃣ **IN at scheduled class**
+
+* Optional panel or sub-view — lowest priority — only displayed if admin chooses
+
+#### Write New Pass (Admin)
+
+| Action                 | Behavior                                       |
+| ---------------------- | ---------------------------------------------- |
+| Select Student         | Dropdown or search                             |
+| Select Destination     | All destinations                               |
+| Scheduled or Immediate | Toggle — write as Scheduled or Immediate pass  |
+| Submit                 | Overrides any current pass (with notification) |
+
+#### Scheduled Pass Management
+
+| Action                | Behavior                                       |
+| --------------------- | ---------------------------------------------- |
+| Create Scheduled pass | For student → destination → time window        |
+| Modify Scheduled pass | Change destination, time, or responsible staff |
+| Cancel Scheduled pass | Remove Scheduled pass                          |
+| View history          | View full Scheduled pass history per student   |
+
+#### Found Without Pass Management
+
+| Action                             | Behavior                                      |
+| ---------------------------------- | --------------------------------------------- |
+| View FWP logs                      | Filter, search                                |
+| Clear erroneous FWP (audit logged) | Mark FWP as "erroneous entry" — action logged |
+| Report patterns                    | Export trends                                 |
+
+---
+
+### 15.5 Emergency Mode — Views & Actions
+
+#### Emergency Activation
+
+| Action                    | Who can do     |
+| ------------------------- | -------------- |
+| Activate Emergency Mode   | Admin/Dev only |
+| Deactivate Emergency Mode | Admin/Dev only |
+
+#### Emergency Panel (Admin)
+
+| View                           | Content                                                                 |
+| ------------------------------ | ----------------------------------------------------------------------- |
+| All OUT passes                 | All students OUT                                                        |
+| All IN but not scheduled class | All students IN to other destinations                                   |
+| Actions                        | "Check student IN here" → assigns staffId + roomId responsibility       |
+| Emergency banner               | Shown at top of UI                                                      |
+| Global Emergency State         | Toggle Emergency Mode for all staff UI                                  |
+| Audit log                      | Tracks Emergency Mode activation, deactivation, all emergency check-ins |
+
+#### Behavior Notes
+
+* Once Emergency Mode is active:
+
+  * **All staff see Emergency Panel**
+  * Admins can monitor who is checking in students
+  * Admins can force-check students IN if needed
+  * **IMPORTANT:** In any real emergency, real-life actions take priority over system use
+
+---
+
+### 15.6 Special Cases & Powers
+
+#### Force Override
+
+* Admin can force close ANY pass at ANY time
+* Admin can write new pass even if other Scheduled pass exists
+* Admin actions always trigger notifications to affected staff
+
+#### Scheduled Pass Precedence
+
+* Admin Scheduled passes **override all other pass types**
+* Admin can cancel any lower-priority Scheduled pass
+
+#### Found Without Pass
+
+* Admin can enter or manage Found Without Pass logs
+* Admin can clear or flag FWP entries with audit trail
+
+#### Emergency Management
+
+* Admin controls activation/deactivation of Emergency Mode
+* Admin sees full Emergency audit log
+
+#### System Settings
+
+* Admin can manage settings in the Settings sheet
+* Settings edits are logged (Phase 1.5+ enhancement)
+
+---
+
+### 15.7 Notifications & Feedback
+
+| Event                        | Recipient(s)            | UI Feedback                        |
+| ---------------------------- | ----------------------- | ---------------------------------- |
+| Admin overrides pass         | Prior responsible staff | Immediate UI message               |
+| Admin force closes pass      | Prior responsible staff | Immediate UI message               |
+| Admin creates Scheduled pass | Destination staff       | Immediate UI message               |
+| Admin cancels Scheduled pass | Destination staff       | Immediate UI message               |
+| Emergency Mode activated     | All staff               | Banner + Emergency Panel shown     |
+| Emergency Mode deactivated   | All staff               | Banner removed, normal UI restored |
+
+---
+
+### 15.8 Limitations
+
+* Admin cannot:
+
+  * Delete pass logs (historical integrity preserved)
+  * Alter timestamps on historical records
+  * Erase audit trail entries (FWP, Emergency logs)
+
+* Dev has additional powers to manage system core if needed (separate Dev Spec covers this)
+
+---
+
+### 15.9 Future Roadmap (Phase 1.5+)
+
+* **Scheduled pass conflict resolution matrix**
+
+  * Automatic resolution of overlapping Scheduled passes
+* **Granular hierarchy matrix**
+
+  * Ex: Guidance Scheduled pass outranks Teacher pass
+* **Emergency "present with me" batch marking**
+
+  * Admin can mark multiple students "with me" in one action
+* **Enhanced Emergency logs**
+
+  * Location/time stamping for emergency check-ins
+* **SIS sync for Scheduled pass auto-population**
+* **Admin-only analytics panel**
+
+  * Trends, pass usage by student, by teacher, by location
+* **Settings edit audit log**
+
+  * Track all admin changes to Settings sheet
+
+---
+
+## 👉 END OF ADMIN UI SPEC — FULL DRAFT
+
+---
+
+## 16. Dev Tools & System Admin Spec
+
+---
+
+### 16.1 Purpose
+
+This section defines how the system is supported, maintained, and extended by developers and system administrators.
+
+Goals:
+
+* Ensure stable operation
+* Provide safe update and migration paths
+* Define responsibilities and safe boundaries for Dev/Admin powers
+* Enable continuous improvement
+
+---
+
+### 16.2 System Settings & Config
+
+#### Settings Sheet
+
+| Field        | Purpose                     |
+| ------------ | --------------------------- |
+| settingKey   | Key name for system setting |
+| settingValue | Current value               |
+| description  | Human-readable purpose      |
+
+#### Example Settings
+
+* **emergencyMode** — TRUE/FALSE toggle
+* **longDurationThreshold** — threshold for LD flag in minutes
+* **periodOverrideDefault** — default for periodOverride behavior
+* **UITheme** — future customizable UI theme value
+
+#### Change Management
+
+* Settings changes should be audited (Phase 1.5+)
+* Dev/Admin can edit Settings — all other users read-only
+
+---
+
+### 16.3 Script / Code Management
+
+#### Structure
+
+| File                     | Purpose                             |
+| ------------------------ | ----------------------------------- |
+| Code.js                  | Core pass state engine              |
+| Data.js                  | Data helpers, caching, sheet access |
+| Auth.js                  | Authentication & token logic        |
+| Router.js                | API routing (if applicable)         |
+| UI files (.html + UI JS) | Front-end templates per role        |
+
+#### Best Practices
+
+* **Lower camelCase** for all variable names, sheet headers
+* **Constants centralized** where possible (SHEETS, SETTINGS, etc)
+* **Core objects** (pass, student, staff) always follow spec
+* **Non-breaking changes only** in minor versions
+* **Major changes require migration plan**
+
+#### Deployment
+
+* **Production** branch is master branch in GAS or GitHub
+* **Testing** branch is used for testing new features safely
+* All migrations must include changelog
+
+---
+
+### 16.4 Sheet Structure & Integrity
+
+#### Required Sheets
+
+* Active Passes
+* Pass Log
+* Permanent Record
+* Student Data
+* Teacher Data
+* Support Data
+* Admin Data
+* Location Data
+* Bell Schedule
+* Settings
+
+#### Header Normalization
+
+* All sheets must use lower camelCase for column headers
+* Header normalizer will correct for common issues
+* System will tolerate minor header changes if known mappings exist
+
+#### Missing Data Handling
+
+* Active Passes / Pass Log / Permanent Record tolerate empty state
+* Student/Teacher/Support/Admin Data expected to be complete
+* Location Data expected to be complete
+* Bell Schedule must define periods for system to work
+
+---
+
+### 16.5 Logging & Audit
+
+#### Logging
+
+* Logger.log used for errors, warnings, performance tracking
+* Critical system events are logged to Pass Log, Permanent Record, or Emergency Log
+* Found Without Pass events logged with timestamp and staffId
+
+#### Audit
+
+* Pass Log is canonical audit of all pass state changes
+* Emergency Log (Phase 1.5) will be canonical for Emergency Mode
+* Settings change log (Phase 1.5) will be canonical for config changes
+
+---
+
+### 16.6 Error Handling & Support
+
+#### Error Types
+
+* PassValidationError — user/action level error (ex: duplicate pass)
+* PassNotFoundError — invalid pass ID references
+* System Error — unexpected runtime exceptions
+
+#### Recovery
+
+* Errors surfaced to UI as friendly messages
+* Critical errors logged
+* Emergency fallback: system always allows admin to write force pass if system partially degraded
+
+---
+
+### 16.7 Dev / Admin Powers
+
+#### Dev Powers
+
+* Access to script editor
+* Ability to patch core functions
+* Can deploy new versions
+* Can run migration scripts
+* Can directly manage sheet structure
+
+#### Admin Powers
+
+* Full UI powers as defined in Admin UI Spec
+* Can edit Settings
+* Can activate/deactivate Emergency Mode
+
+---
+
+### 16.8 Backward Compatibility
+
+#### Principles
+
+* All future changes must maintain:
+
+  * Pass Log structure
+  * Permanent Record structure
+  * Sheet header casing/naming conventions
+  * Core API function signatures
+
+* If breaking change required:
+
+  * Migration plan must be created
+  * Version tagging must occur
+  * Users must be notified
+
+---
+
+### 16.9 Roadmap
+
+* **Emergency Log sheet** → Phase 1.5
+* **Settings audit trail** → Phase 1.5
+* **Automatic header normalization at runtime**
+* **Enhanced admin analytics panel**
+* **Live system health dashboard**
+* **Dev-only debug console in Admin UI**
+* **SIS integration for student schedules**
+* **Automated test framework for core pass functions**
+* **Versioned API spec for third-party integrations**
+
+---
+
+## 👉 END OF SECTION 16: DEV TOOLS & SYSTEM ADMIN SPEC
+
+---
+
+## 17. System Behavior & Edge Cases Spec
+
+---
+
+### 17.1 Purpose
+
+This section documents edge cases, tricky scenarios, and corner behaviors that the system must handle gracefully.
+
+Goals:
+
+* Ensure predictable and safe behavior
+* Prevent logic breakage
+* Document real-world exceptions
+
+---
+
+### 17.2 Pass State Edge Cases
+
+#### A. Student is OUT when period changes
+
+* Auto-close fires → student is assumed to return to scheduled class
+* Pass archived → Permanent Record updated
+
+#### B. Student checks in to wrong location
+
+* System honors check-in → responsibility shifts to new location/staff
+* Admin may force-correct if needed
+
+#### C. Student tries to create new pass while already OUT
+
+* System blocks → error message: "You must return IN before starting new pass"
+
+#### D. Teacher/support writes new pass for student who is OUT
+
+* System force-closes prior pass, logs override, creates new pass
+* Notifications sent to prior responsible staff
+
+#### E. Emergency Mode active, admin writes pass
+
+* Emergency overrides apply → admin pass proceeds even if conflicting
+
+---
+
+### 17.3 Emergency Mode Edge Cases
+
+#### A. Student has no active pass
+
+* Still shown in Emergency panel as "Unknown state"
+
+#### B. Student IN scheduled class
+
+* Shown but marked "IN Scheduled Class" (lowest priority)
+
+#### C. Teacher force-checks student IN during emergency
+
+* Becomes current responsible staff
+* Check-in logged to Emergency Log
+
+#### D. Emergency Mode ends mid-pass
+
+* Normal pass flow resumes
+* No automatic close → student remains in current pass state
+
+---
+
+### 17.4 Scheduled Pass Edge Cases
+
+#### A. Scheduled pass overlaps active OUT
+
+* Admin-level override required to honor Scheduled pass
+* Staff notified if override occurs
+
+#### B. Multiple Scheduled passes
+
+* Higher priority source wins (admin > support > teacher)
+* Lower priority passes blocked with notification
+
+#### C. Scheduled pass expires without activation
+
+* Marked "expired" in Scheduled pass log
+
+---
+
+### 17.5 Autonomy Trigger Edge Cases
+
+#### A. Teacher disables "studentTo" while pass is active
+
+* Existing pass honored to completion
+* New passes blocked
+
+#### B. Manual approval pending, teacher unavailable
+
+* Fallback: auto-expire after timeout (ex: 5 min)
+* Student may cancel pending pass
+
+---
+
+### 17.6 UI Behavior Safety Nets
+
+#### A. Button disabling
+
+* Buttons auto-disable after click until operation confirmed
+* Prevents duplicate pass requests or double actions
+
+#### B. Emergency banner
+
+* Emergency banner persists across navigation and refresh
+
+#### C. Missing data handling
+
+* If required field missing → user-friendly error + retry
+
+---
+
+### 17.7 Notifications Edge Cases
+
+#### A. Multiple overlapping notifications
+
+* Notifications coalesced when possible → prevent spamming
+
+#### B. Emergency overrides in progress
+
+* Emergency notifications take precedence
+
+#### C. Admin force actions
+
+* Always trigger notification regardless of flow
+
+---
+
+### 17.8 Data Integrity & Recovery
+
+#### A. Sheet corruption detected
+
+* Fallback to last known good cache if possible
+* Admin alerted
+
+#### B. Pass orphaned (active but no matching student)
+
+* Logged to exception queue (Phase 1.5)
+* Admin review required
+
+#### C. Missing or duplicate timestamps
+
+* Auto-correct routines where safe
+* If not recoverable → log error, notify Dev
+
+---
+
+### 17.9 Future Work
+
+* **Enhanced orphan pass detection**
+* **Advanced scheduled pass conflict resolution**
+* **Teacher unavailability logic**
+* **Emergency role escalation**
+* **"Found without pass" bulk entry support**
+* **Automated system health checks**
+* **Fallback read-only mode if partial system degradation**
+
+---
+
+## 👉 END OF SECTION 17: SYSTEM BEHAVIOR & EDGE CASES SPEC
+
+---
+
+---
+
+## 18. Glossary
+
+---
+
+### Purpose
+
+The glossary defines key terms used throughout this specification to ensure clarity and consistency.
+
+---
+
+### Terms
+
+**Active Pass** — A currently open pass in the Active Passes sheet.
+
+**Admin** — A user with full privileges, including Settings edits and Emergency Mode control.
+
+**Admin Panel** — The Admin UI that displays all passes and provides full override capabilities.
+
+**Autonomy Trigger** — Teacher/support-controlled setting for allowing or restricting pass creation to/from locations.
+
+**Cache** — Temporary storage of sheet data to optimize performance.
+
+**DestinationID** (DEST ID) — The label representing a pass destination.
+
+**Dev** — Developer with full access to code, migration, and system health functions.
+
+**Emergency Mode** — Special mode where Admins trigger system-wide behavior changes.
+
+**Emergency Panel** — The special UI shown to all staff during Emergency Mode.
+
+**Emergency Log** — Canonical record of Emergency Mode actions and check-ins.
+
+**Found Without Pass** — A flagged event when a student is observed in hallway without valid pass.
+
+**IN Scheduled Class** — The default system assumption when no pass is active.
+
+**Leg ID** — Counter incremented each time a pass changes state.
+
+**Long Duration (LD)** — Flag for passes exceeding the configured long duration threshold.
+
+**Override** — When a higher authority (Admin/support/teacher) force-closes or replaces an active pass.
+
+**Pass ID** — The unique identifier for a pass.
+
+**Pass Log** — Canonical audit sheet for all pass state changes.
+
+**Permanent Record** — Long-term archive of closed passes.
+
+**Scheduled Pass** — A future-scheduled pass entered by Admin/support/teacher.
+
+**Staff ID** — Unique identifier for staff (teachers, support, admin).
+
+**Student ID** — Unique identifier for students.
+
+**Student UI** — The mobile-first student-facing pass interface.
+
+**Teacher UI** — The teacher-facing UI for writing and managing passes.
+
+**UI** — User interface, the interactive screens seen by users (students, staff, admin).
+
+**Emergency Override** — Admin-level or system-level action that bypasses normal flow during an emergency.
+
+**Found Without Pass Log** — Record tracking students located in hallway without a valid pass.
+
+**Responsibility** — The current staff member/location responsible for a student.
+
+**Scheduled Class** — The class where the student is expected to be during the current period.
+
+**Student Autonomy** — The design principle allowing students to manage their own pass state within controlled boundaries.
+
+**Teacher Autonomy** — The design principle allowing teachers to opt in or restrict student-initiated passes to/from their locations.
+
+**Hierarchy of Authority** — The established precedence order for override actions: Admin > Support > Teacher > Student.
+
+**System Settings** — Configurable parameters controlling system-wide behavior.
+
+**Audit Trail** — Permanent record of key system events and changes for transparency and accountability.
+
+**Version Tag** — Identifier marking versions of system code/spec.
+
+**SIS Integration** — Future linkage with Student Information System (such as Infinite Campus) to automate data.
+
+**Floating Teacher** — A teacher assigned to multiple rooms rather than a single fixed location.
+
+**Hallway State** — The OUT state when a student is actively moving and not checked into a destination.
+
+**Restroom Special Case** — The pass case where restroom acts as a temporary destination but does not require check-in.
+
+**Emergency Check-In** — The act of a teacher/staff member claiming responsibility for a student during Emergency Mode.
+
+**Emergency Activation** — The event when an admin turns Emergency Mode ON.
+
+**Emergency Deactivation** — The event when an admin turns Emergency Mode OFF.
+
+**Period Override** — Flag allowing specific locations to operate outside normal period schedule restrictions.
+
+**UI Disable** — UI behavior where certain buttons are disabled to prevent invalid actions.
+
+**Conflict Notification** — A system alert to users when actions conflict with scheduled passes or hierarchy rules.
+
+**Orphaned Pass** — A pass with inconsistent or incomplete state (example: no matching student).
+
+**Audit Safe** — A principle ensuring all state changes are logged without silent overrides.
+
+---
+
+## END OF SPECIFICATION DOCUMENT
+
+---
+
+This specification now serves as the gold master for Eagle Hall Pass v2.0. Further changes should be proposed via controlled versioning and documented changelogs.
+
+---
 
