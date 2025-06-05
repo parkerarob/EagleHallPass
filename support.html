@@ -3,84 +3,207 @@
   <head>
     <base target="_top">
     <title>Support Dashboard</title>
+    <link rel="stylesheet" href="common.css">
   </head>
-  <body>
-    <h1>Support Dashboard</h1>
-    <p>Welcome, <?= support.firstName ?> <?= support.lastName ?>.</p>
-    <button onclick="openPass()">Open Pass</button>
+  <body style="background:#F9F9F9;">
+    <div class="container">
+      <div class="card header" style="background:#00274C;color:#FFCB05;display:flex;justify-content:space-between;align-items:center;">
+        <h1 style="margin:0;">Support Dashboard</h1>
+        <div>
+          <span>Welcome, <?= support.firstName ?> <?= support.lastName ?></span>
+          <span id="settings-gear" class="icon-gear" style="cursor:pointer;margin-left:10px;"></span>
+        </div>
+      </div>
 
-    <table id="active-passes" border="1">
-      <thead>
-        <tr>
-          <th>Student ID</th>
-          <th>Status</th>
-          <th>Destination</th>
-          <th>Action</th>
-        </tr>
-      </thead>
-      <tbody id="pass-body"></tbody>
-    </table>
+      <div id="settings-panel" class="card" style="display:none;">
+        <label><input id="override-toggle" type="checkbox"> Enable Overrides</label>
+      </div>
 
+      <div class="card filters" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <select id="teacher-filter" multiple style="flex:1;min-width:150px;"></select>
+        <div>
+          <label><input type="radio" name="statusFilter" value="OUT" checked> Outgoing</label>
+          <label><input type="radio" name="statusFilter" value="IN"> Incoming</label>
+        </div>
+        <button id="view-all-button" type="button" class="btn-secondary">View All Active Passes</button>
+        <button id="refresh-button" type="button" class="btn-secondary">Refresh</button>
+      </div>
+
+      <div id="active-passes-container" class="grid"></div>
+
+      <div class="lookup-section card">
+        <input id="support-search" type="text" placeholder="Search by name, ID, or email" style="width:100%;margin-bottom:8px;">
+        <div id="lookup-results" class="dropdown"></div>
+        <div id="lookup-card"></div>
+      </div>
+    </div>
+
+    <script src="common.js"></script>
     <script>
-      const CSRF_TOKEN = '<?= csrfToken ?>';
-      function renderPasses(passes) {
-        var body = document.getElementById('pass-body');
-        body.innerHTML = '';
-        passes.forEach(function(p) {
-          var tr = document.createElement('tr');
-          var studentTd = document.createElement('td');
-          studentTd.textContent = p.studentID;
-          var statusTd = document.createElement('td');
-          statusTd.textContent = p.status;
-          var destTd = document.createElement('td');
-          destTd.textContent = p.destinationID;
-          var actionTd = document.createElement('td');
-          var btn = document.createElement('button');
-          btn.textContent = 'Close';
-          btn.onclick = function() { closePass(p.passID); };
-          actionTd.appendChild(btn);
-          tr.appendChild(studentTd);
-          tr.appendChild(statusTd);
-          tr.appendChild(destTd);
-          tr.appendChild(actionTd);
-          body.appendChild(tr);
+      var viewAllMode = false;
+      var selectedStudentName = '';
+
+      document.getElementById('settings-gear').addEventListener('click', function() {
+        var panel = document.getElementById('settings-panel');
+        panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+      });
+
+      google.script.run.withSuccessHandler(function(list) {
+        var sel = document.getElementById('teacher-filter');
+        list.forEach(function(t) {
+          var opt = document.createElement('option');
+          opt.value = t.staffID || t.teacherID;
+          opt.textContent = t.firstName + ' ' + t.lastName;
+          sel.appendChild(opt);
+        });
+        refreshActiveList();
+      }).getSupportTeacherList(<?= support.supportID ?>);
+
+      document.getElementById('teacher-filter').addEventListener('change', function() {
+        viewAllMode = false;
+        refreshActiveList();
+      });
+
+      document.querySelectorAll('input[name="statusFilter"]').forEach(function(r) {
+        r.addEventListener('change', function() {
+          viewAllMode = false;
+          refreshActiveList();
+        });
+      });
+
+      document.getElementById('view-all-button').addEventListener('click', function() {
+        viewAllMode = true;
+        refreshActiveList();
+      });
+
+      document.getElementById('refresh-button').addEventListener('click', refreshActiveList);
+
+      function refreshActiveList() {
+        var status = document.querySelector('input[name="statusFilter"]:checked').value;
+        var selectedTeachers = Array.from(document.getElementById('teacher-filter').selectedOptions).map(function(o){ return o.value; });
+        if (viewAllMode) {
+          google.script.run.withSuccessHandler(renderActivePasses).getAllActivePasses(status);
+        } else {
+          google.script.run.withSuccessHandler(renderActivePasses).getActivePassesForTeachers(selectedTeachers, status);
+        }
+      }
+      setInterval(refreshActiveList, 45000);
+
+      function renderActivePasses(passes) {
+        var container = document.getElementById('active-passes-container');
+        container.innerHTML = '';
+        passes.forEach(function(p){
+          var card = document.createElement('div');
+          card.className = 'card pass-card';
+          if(p.status === 'IN') card.classList.add('returned');
+          card.setAttribute('data-pass-id', p.passID);
+          var html = '<h3>' + p.studentName + '</h3>' +
+                     '<p>Teacher: ' + p.teacherName + '</p>' +
+                     '<p>Destination: ' + p.destination + '</p>';
+          if(p.status === 'OUT') {
+            html += '<p>Time Out: ' + p.timeOut + '</p>' +
+                     '<button id="return-' + p.passID + '" type="button" class="btn-primary">Mark Returned</button>';
+            if(document.getElementById('override-toggle').checked) {
+              html += ' <button id="override-' + p.passID + '" type="button" class="btn-secondary">Override</button>';
+            }
+          } else {
+            html += '<p>Returned at: ' + p.timeIn + '</p>' +
+                     '<span class="label-returned">Returned</span>';
+          }
+          card.innerHTML = html;
+          container.appendChild(card);
+
+          if(p.status === 'OUT') {
+            var btn = document.getElementById('return-' + p.passID);
+            btn.addEventListener('click', function(){
+              btn.disabled = true;
+              showSpinner('return-' + p.passID);
+              google.script.run.withSuccessHandler(function(){
+                hideSpinner('return-' + p.passID);
+                refreshActiveList();
+              }).updatePassStatus(p.passID, 'IN', <?= support.supportID ?>);
+            });
+            if(document.getElementById('override-toggle').checked) {
+              var obtn = document.getElementById('override-' + p.passID);
+              obtn.addEventListener('click', function(){
+                obtn.disabled = true;
+                showSpinner('override-' + p.passID);
+                google.script.run.withSuccessHandler(function(){
+                  hideSpinner('override-' + p.passID);
+                }).overridePass(p.passID, '<?= support.supportID ?>');
+              });
+            }
+          }
         });
       }
 
-      function fetchPasses() {
-        google.script.run.withSuccessHandler(renderPasses).listActivePasses();
+      var searchInput = document.getElementById('support-search');
+      var debounceTimer;
+      searchInput.addEventListener('keyup', function(){
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(function(){
+          var query = searchInput.value.trim();
+          if(!query){
+            document.getElementById('lookup-results').innerHTML = '';
+            return;
+          }
+          google.script.run.withSuccessHandler(renderLookupResults).getStudentByLookup(query);
+        },300);
+      });
+
+      function renderLookupResults(results){
+        var list = document.getElementById('lookup-results');
+        list.innerHTML = '';
+        results.slice(0,5).forEach(function(s){
+          var item = document.createElement('div');
+          item.className = 'dropdown-item';
+          item.setAttribute('data-student-id', s.studentID);
+          item.textContent = s.firstName + ' ' + s.lastName + ' (' + s.studentID + ')';
+          list.appendChild(item);
+        });
       }
 
-      function openPass() {
-        var studentID = prompt('Student ID');
-        if (!studentID) return;
-        var destinationID = prompt('Destination ID');
-        if (!destinationID) return;
-        google.script.run
-          .withSuccessHandler(fetchPasses)
-          .supportAction({
-            action: 'openPass',
-            studentID: studentID,
-            destinationID: destinationID,
-            notes: '',
-            csrfToken: CSRF_TOKEN
+      document.getElementById('lookup-results').addEventListener('click', function(e){
+        if(e.target.classList.contains('dropdown-item')){
+          var id = e.target.getAttribute('data-student-id');
+          selectedStudentName = e.target.textContent;
+          google.script.run.withSuccessHandler(function(pass){
+            renderLookupCard(pass);
+          }).getCurrentStudentPass(id);
+          this.innerHTML = '';
+          searchInput.value = '';
+        }
+      });
+
+      function renderLookupCard(pass){
+        var container = document.getElementById('lookup-card');
+        container.innerHTML = '';
+        var card = document.createElement('div');
+        card.className = 'card lookup-card';
+        var html = '<h3>' + selectedStudentName + '</h3>';
+        if(!pass){
+          html += '<p>No Active Pass</p>';
+        } else if(pass.status === 'OUT') {
+          html += '<p>OUT at ' + pass.destination + ' since ' + pass.timeOut + '</p>' +
+                   '<button id="lookup-return-' + pass.passID + '" type="button" class="btn-primary">Mark Returned</button>';
+        } else {
+          html += '<p>IN since ' + pass.timeIn + '</p>';
+        }
+        card.innerHTML = html;
+        container.appendChild(card);
+        if(pass && pass.status === 'OUT') {
+          var btn = document.getElementById('lookup-return-' + pass.passID);
+          btn.addEventListener('click', function(){
+            btn.disabled = true;
+            showSpinner('lookup-return-' + pass.passID);
+            google.script.run.withSuccessHandler(function(){
+              hideSpinner('lookup-return-' + pass.passID);
+              refreshActiveList();
+              renderLookupCard(null);
+            }).updatePassStatus(pass.passID, 'IN', <?= support.supportID ?>);
           });
+        }
       }
-
-      function closePass(passID) {
-        google.script.run
-          .withSuccessHandler(fetchPasses)
-          .supportAction({
-            action: 'closePass',
-            passID: passID,
-            flag: '',
-            notes: '',
-            csrfToken: CSRF_TOKEN
-          });
-      }
-
-      fetchPasses();
-      setInterval(fetchPasses, 60000);
     </script>
   </body>
 </html>
