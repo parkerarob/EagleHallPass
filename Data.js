@@ -7,6 +7,9 @@ const CACHE_KEY_PREFIX = 'EHP_CACHE_';
 const CACHE_EXPIRATION_MINUTES = 5;
 
 const SHEETS = {
+  PASS_LOG: 'Pass Log',
+  ACTIVE_PASSES: 'Active Passes',
+  PERMANENT_RECORD: 'Permanent Record',
   STUDENTS: 'Student Data',
   TEACHERS: 'Teacher Data',
   SUPPORT: 'Support Data',
@@ -14,8 +17,6 @@ const SHEETS = {
   SETTINGS: 'Settings',
   BELL_SCHEDULE: 'Bell Schedule'
 };
-
-const ACTIVE_PASSES_SHEET = 'Active Passes';
 
 function getSpreadsheet() {
   return SpreadsheetApp.getActiveSpreadsheet();
@@ -191,7 +192,7 @@ function getActivePassesForTeacher(staffID) {
   const classStudents = getStudentsForTeacherCurrentPeriod(staffID);
   const ids = classStudents.map(s => String(s.studentID));
   if (ids.length === 0) return [];
-  const sheet = getSpreadsheet().getSheetByName(ACTIVE_PASSES_SHEET);
+  const sheet = getSpreadsheet().getSheetByName(SHEETS.ACTIVE_PASSES);
   if (!sheet) return [];
   const rows = sheet.getDataRange().getValues();
   rows.shift();

@@ -4,12 +4,6 @@
  * Spec reference: "Pass State Logic" section lines 239-260.
  */
 
-const PASS_LOG_SHEET = 'Pass Log';
-const ACTIVE_PASSES_SHEET = 'Active Passes';
-const PERMANENT_RECORD_SHEET = 'Permanent Record';
-
-
-
 /**
  * Custom error types for better error handling and debugging
  */
@@ -80,7 +74,7 @@ function getSheet(name) {
 }
 
 function appendPassLog(entry) {
-  const sheet = getSheet(PASS_LOG_SHEET);
+  const sheet = getSheet(SHEETS.PASS_LOG);
   sheet.appendRow([
     entry.timestamp,
     entry.passID,
@@ -121,7 +115,7 @@ function getCurrentStudentPass(studentID, csrfToken) {
     throw new Error('Invalid CSRF token');
   }
   
-  const sheet = getSheet(ACTIVE_PASSES_SHEET);
+  const sheet = getSheet(SHEETS.ACTIVE_PASSES);
   const data = sheet.getDataRange().getValues();
   for (let i = 1; i < data.length; i++) {
     const row = data[i];
@@ -164,7 +158,7 @@ function getCurrentStudentPassOptimized(studentID) {
 }
 
 function getAllActivePasses() {
-  const sheet = getSheet(ACTIVE_PASSES_SHEET);
+  const sheet = getSheet(SHEETS.ACTIVE_PASSES);
   const data = sheet.getDataRange().getValues();
   const passes = [];
   for (let i = 1; i < data.length; i++) {
@@ -234,7 +228,7 @@ function openPass(studentID, originStaffID, destinationID, notes) {
 
       try {
         // Existing duplicate check code stays here
-        const sheet = getSheet(ACTIVE_PASSES_SHEET);
+        const sheet = getSheet(SHEETS.ACTIVE_PASSES);
         const data = getActivePassesData();
         for (let i = 1; i < data.length; i++) {
           if (data[i][1] === studentID) {
@@ -346,7 +340,7 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
     try {
     // Prevent pass changes if emergency mode is enabled
     checkEmergencyMode();
-    const sheet = getSheet(ACTIVE_PASSES_SHEET);
+    const sheet = getSheet(SHEETS.ACTIVE_PASSES);
     const data = getActivePassesData();
     let rowIndex = -1;
     let row;
@@ -424,7 +418,7 @@ function closePass(passID, closingStaffID, flag, notes) {
     try {
     // Prevent pass changes if emergency mode is enabled
     checkEmergencyMode();
-    const sheet = getSheet(ACTIVE_PASSES_SHEET);
+    const sheet = getSheet(SHEETS.ACTIVE_PASSES);
     const data = getActivePassesData();
     let rowIndex = -1;
     let row;
@@ -462,7 +456,7 @@ function closePass(passID, closingStaffID, flag, notes) {
       notes: safeNotes
     });
 
-    const recordSheet = getSheet(PERMANENT_RECORD_SHEET);
+    const recordSheet = getSheet(SHEETS.PERMANENT_RECORD);
     // Use setValues instead of appendRow to preserve sanitization formatting
     const recordLastRow = recordSheet.getLastRow() + 1;
     recordSheet.getRange(recordLastRow, 1, 1, 10).setValues([[
@@ -494,7 +488,7 @@ function closePassStudent(passID, csrfToken) {
   }
   
   // Get the pass to find the student
-  const sheet = getSheet(ACTIVE_PASSES_SHEET);
+  const sheet = getSheet(SHEETS.ACTIVE_PASSES);
   const data = getActivePassesData();
   let passRow = null;
   
@@ -529,7 +523,7 @@ function autoClosePasses() {
         (next ? next.period : 'N/A')
     );
 
-    const sheet = getSheet(ACTIVE_PASSES_SHEET);
+    const sheet = getSheet(SHEETS.ACTIVE_PASSES);
     const data = sheet.getDataRange().getValues();
     for (let i = 1; i < data.length; i++) {
       const row = data[i];
@@ -566,7 +560,7 @@ function autoClosePasses() {
 }
 
 function getOutStudents() {
-  const sheet = getSheet(ACTIVE_PASSES_SHEET);
+  const sheet = getSheet(SHEETS.ACTIVE_PASSES);
   const data = sheet.getDataRange().getValues();
   const out = [];
   for (let i = 1; i < data.length; i++) {
@@ -594,7 +588,7 @@ function getActivePassesData() {
     return cached;
   }
   
-  const sheet = getSheet(ACTIVE_PASSES_SHEET);
+  const sheet = getSheet(SHEETS.ACTIVE_PASSES);
   const data = sheet.getDataRange().getValues();
   
   // Cache for 1 minute (shorter than other caches due to frequent updates)
