@@ -1,0 +1,37 @@
+name: Deploy to Google Apps Script
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    name: Push to GAS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v3
+
+      - name: Install Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: "18.x"
+
+      - name: Install clasp
+        run: npm install -g @google/clasp@2.4.2
+
+      - name: Authenticate clasp
+        # This assumes you’ve stored a service account key JSON in 
+        # your repo’s “Settings → Secrets” under GAS_SERVICE_ACCOUNT
+        env:
+          GITHUB_SECRET: ${{ secrets.GAS_SERVICE_ACCOUNT }}
+        run: |
+          echo "$GITHUB_SECRET" > ./service-account.json
+          clasp login --creds ./service-account.json
+
+      - name: Push to Apps Script
+        run: |
+          # If your .clasp.json is in the repo, `clasp push` will use it.
+          clasp push
