@@ -52,6 +52,7 @@ function doPost(e) {
     }
     return ContentService.createTextOutput('OK');
   } catch (err) {
-    return ContentService.createTextOutput('ERROR: ' + err.message);
+    Logger.log(err.stack || err.message);
+    return ContentService.createTextOutput('ERROR');
   }
 }

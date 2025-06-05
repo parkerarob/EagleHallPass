@@ -66,10 +66,11 @@
 
         function fetchWhoAmI() {
           google.script.run.withSuccessHandler(function(res) {
-            document.getElementById('whoami').innerHTML =
-              '<b>Email:</b> ' + res.email + '<br>' +
-              '<b>Role:</b> ' + res.role + '<br>' +
-              '<b>Source:</b> ' + res.source;
+            var div = document.getElementById('whoami');
+            div.textContent =
+              'Email: ' + res.email +
+              ' | Role: ' + res.role +
+              ' | Source: ' + res.source;
           }).whoAmI();
         }
 

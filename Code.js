@@ -37,6 +37,15 @@ function generatePassId() {
   return Utilities.getUuid();
 }
 
+function sanitizeForSheet(value) {
+  if (typeof value !== 'string') return value;
+  const first = value.charAt(0);
+  if (first === '=' || first === '+' || first === '-' || first === '@') {
+    return "'" + value;
+  }
+  return value;
+}
+
 function getCurrentStudentPass(studentID) {
   const sheet = getSheet(ACTIVE_PASSES_SHEET);
   const data = sheet.getDataRange().getValues();
@@ -95,12 +104,14 @@ function openPass(studentID, originStaffID, destinationID, notes) {
     const passID = generatePassId();
     const now = new Date();
     const nowIso = now.toISOString();
+    const safeDest = sanitizeForSheet(destinationID);
+    const safeNotes = sanitizeForSheet(notes);
     const row = [
       passID,
       studentID,
       originStaffID,
       originStaffID,
-      destinationID,
+      safeDest,
       1,
       'OPEN',
       'OUT',
@@ -116,9 +127,9 @@ function openPass(studentID, originStaffID, destinationID, notes) {
       state: 'OPEN',
       status: 'OUT',
       staffID: originStaffID,
-      destinationID: destinationID,
+      destinationID: safeDest,
       flag: '',
-      notes: notes
+      notes: safeNotes
     });
     return passID;
   } catch (err) {
@@ -174,8 +185,10 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
       finalFlag = finalFlag ? finalFlag + ' LD' : 'LD';
     }
 
+    const safeLoc = sanitizeForSheet(locationID);
+    const safeNotes = sanitizeForSheet(notes);
     row[3] = staffID;
-    row[4] = locationID;
+    row[4] = safeLoc;
     row[5] = legID;
     row[7] = status;
     sheet.getRange(rowIndex, 1, 1, row.length).setValues([row]);
@@ -188,9 +201,9 @@ function updatePassStatus(passID, status, locationID, staffID, flag, notes) {
       state: row[6],
       status: status,
       staffID: staffID,
-      destinationID: locationID,
+      destinationID: safeLoc,
       flag: finalFlag,
-      notes: notes
+      notes: safeNotes
     });
   } catch (err) {
     Logger.log(err.stack || err.message);
@@ -228,6 +241,7 @@ function closePass(passID, closingStaffID, flag, notes) {
       finalFlag = finalFlag ? finalFlag + ' LD' : 'LD';
     }
 
+    const safeNotes = sanitizeForSheet(notes);
     appendPassLog({
       timestamp: now,
       passID: passID,
@@ -238,7 +252,7 @@ function closePass(passID, closingStaffID, flag, notes) {
       staffID: closingStaffID,
       destinationID: row[4],
       flag: finalFlag,
-      notes: notes
+      notes: safeNotes
     });
 
     const recordSheet = getSheet(PERMANENT_RECORD_SHEET);
@@ -252,7 +266,7 @@ function closePass(passID, closingStaffID, flag, notes) {
       row[4],
       legID,
       finalFlag || '',
-      notes || ''
+      safeNotes || ''
     ]);
 
     sheet.deleteRow(rowIndex);
