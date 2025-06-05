@@ -28,18 +28,21 @@
         body.innerHTML = '';
         passes.forEach(function(p) {
           var tr = document.createElement('tr');
-          var btn =
-            '<button onclick="closePass(\'' + p.passID + '\')">Close</button>';
-          tr.innerHTML =
-            '<td>' +
-            p.studentID +
-            '</td><td>' +
-            p.status +
-            '</td><td>' +
-            p.destinationID +
-            '</td><td>' +
-            btn +
-            '</td>';
+          var studentTd = document.createElement('td');
+          studentTd.textContent = p.studentID;
+          var statusTd = document.createElement('td');
+          statusTd.textContent = p.status;
+          var destTd = document.createElement('td');
+          destTd.textContent = p.destinationID;
+          var actionTd = document.createElement('td');
+          var btn = document.createElement('button');
+          btn.textContent = 'Close';
+          btn.onclick = function() { closePass(p.passID); };
+          actionTd.appendChild(btn);
+          tr.appendChild(studentTd);
+          tr.appendChild(statusTd);
+          tr.appendChild(destTd);
+          tr.appendChild(actionTd);
           body.appendChild(tr);
         });
       }
