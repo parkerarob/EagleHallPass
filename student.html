@@ -1,168 +1,185 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <base target="_top">
-    <title>Student Dashboard</title>
-    <link rel="stylesheet" href="common.css">
-    <!-- Bootstrap CSS -->
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hall Pass - Student</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.5/font/bootstrap-icons.css" rel="stylesheet">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
-  </head>
-  <body>
-    <nav class="navbar sticky-top bg-dark text-light px-3">
-      <span>Student Dashboard</span>
-    </nav>
-    <div class="container-fluid mt-3">
-      <h1>Student Dashboard</h1>
-      <p>Welcome, <?= student.firstName ?> <?= student.lastName ?>.</p>
+  <link href="https://cdn.jsdelivr.net/npm/animate.css@4.1.1/animate.min.css" rel="stylesheet">
+  <style>
+    body {
+      background-color: #f7f9fc;
+      color: #333;
+    }
+    .navbar {
+      background-color: #00274C;
+      color: #fff;
+    }
+    .navbar-brand {
+      font-weight: bold;
+      font-size: 1.2rem;
+    }
+    .main-card {
+      border-radius: 16px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 20px;
+      background-color: #fff;
+    }
+    .footer {
+      text-align: center;
+      padding: 1rem;
+      font-size: 0.9rem;
+      color: #777;
+    }
+    .spinner-border {
+      width: 1.5rem;
+      height: 1.5rem;
+    }
+    .last-updated {
+      font-size: 0.85rem;
+      color: #666;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+  <nav class="navbar navbar-expand navbar-dark px-3">
+    <span class="navbar-brand">Hall Pass</span>
+    <div class="ms-auto">Welcome, <?= student.firstName ?> <?= student.lastName ?></div>
+  </nav>
 
-      <div class="card mb-3" id="card-pass-status">
-        <div class="card-body">
-          <span id="pass-state-text">Loading...</span>
-        </div>
-      </div>
-
-      <div class="card mb-3" id="card-pass-action"><div class="card-body"></div></div>
+  <main class="container py-4">
+    <div id="pass-card" class="main-card animate__animated animate__fadeIn">
+      <h3 id="pass-state-text">Loading pass status...</h3>
+      <div id="pass-action" class="mt-4"></div>
+      <div class="last-updated" id="last-updated"></div>
     </div>
+  </main>
 
-    <footer class="footer">
-      <small><em>Ashley High School</em></small>
-    </footer>
+  <footer class="footer">
+    &copy; Ashley High School
+  </footer>
 
-    <script src="common.js"></script>
-    <script>
-      const CSRF_TOKEN = '<?= csrfToken ?>';
+  <script src="ui-utils.js"></script>
+  <script>
+    const CSRF_TOKEN = '<?= csrfToken ?>';
+    const studentID = '<?= student.studentID ?>';
 
-      function updatePassState(pass) {
-        var text = document.getElementById('pass-state-text');
+    function fetchPassState() {
+      showLoading();
+      google.script.run
+        .withSuccessHandler(updatePassState)
+        .withFailureHandler((err) => {
+          document.getElementById('pass-state-text').textContent = 'Error loading pass status';
+          hideLoading();
+        })
+        .getCurrentStudentPass(studentID, CSRF_TOKEN);
+    }
+
+    function updatePassState(pass) {
+      const stateText = document.getElementById('pass-state-text');
+      const actionArea = document.getElementById('pass-action');
+
+      actionArea.classList.add('animate__animated', 'animate__fadeOut');
+      setTimeout(() => {
+        actionArea.classList.remove('animate__fadeOut');
+        actionArea.innerHTML = '';
+
         if (!pass || pass.status === 'IN') {
-          text.textContent = 'No active pass';
+          stateText.textContent = 'No Active Pass';
           renderRequestForm();
-          return;
+        } else {
+          stateText.textContent = `OUT to ${pass.destinationID}`;
+          renderCloseButton(pass.passID);
         }
-        text.textContent = 'Pass OUT';
-        renderCloseCard(pass.passID);
-      }
 
-      function fetchPassState() {
+        updateLastUpdated();
+        hideLoading();
+      }, 300);
+    }
+
+    function renderRequestForm() {
+      const actionArea = document.getElementById('pass-action');
+      actionArea.innerHTML = `
+        <div class="mb-3">
+          <label for="destination-select" class="form-label">Choose Destination</label>
+          <select id="destination-select" class="form-select">
+            <option value="CLASSROOM">Classroom</option>
+            <option value="RESTROOM">Restroom</option>
+            <option value="LIBRARY">Library</option>
+            <option value="OFFICE">Office</option>
+          </select>
+        </div>
+        <button id="request-button" class="btn btn-primary w-100">Request Pass</button>
+      `;
+
+      document.getElementById('request-button').addEventListener('click', () => {
+        const button = document.getElementById('request-button');
+        button.disabled = true;
+        showSpinner('request-button');
+        const destination = document.getElementById('destination-select').value;
+
         google.script.run
-          .withSuccessHandler(updatePassState)
-          .withFailureHandler(function(error) {
-            console.error('Failed to fetch pass state:', error);
-            document.getElementById('pass-state-text').textContent = 'Error loading pass status';
+          .withSuccessHandler((pass) => {
+            hideSpinner('request-button');
+            updatePassState(pass);
           })
-          .getCurrentStudentPass('<?= student.studentID ?>', CSRF_TOKEN);
-      }
+          .withFailureHandler((err) => {
+            hideSpinner('request-button');
+            button.disabled = false;
+            showToast('Failed to request pass: ' + err.message, 'error');
+          })
+          .requestPass(studentID, destination);
+      });
+    }
 
-      function renderRequestForm() {
-        var card = document.getElementById('card-pass-action').querySelector('.card-body');
-        card.style.opacity = 0;
-        setTimeout(function() {
-          card.innerHTML =
-            '<select id="destination-select" class="form-select mb-2">' +
-            '<option value="CLASSROOM">CLASSROOM</option>' +
-            '<option value="RESTROOM">RESTROOM</option>' +
-            '<option value="LIBRARY">LIBRARY</option>' +
-            '<option value="OFFICE">OFFICE</option>' +
-            '</select>' +
-            '<button id="request-button" type="button" class="btn btn-primary">Request Pass</button>';
-          card.style.opacity = 1;
-          document.getElementById('request-button').onclick = function() {
-            var requestBtn = document.getElementById('request-button');
-            requestBtn.disabled = true;
-            showSpinner('request-button');
-            var destination = document.getElementById('destination-select').value;
-            google.script.run
-              .withSuccessHandler(function(pass) {
-                hideSpinner('request-button');
-                updatePassState(pass);
-                renderCloseCard(pass.passID);
-              })
-              .withFailureHandler(function(error) {
-                hideSpinner('request-button');
-                document.getElementById('request-button').disabled = false;
-                alert('Failed to request pass: ' + error.message);
-              })
-              .requestPass('<?= student.studentID ?>', destination);
-          };
-        }, 300);
-      }
+    function renderCloseButton(passID) {
+      const actionArea = document.getElementById('pass-action');
+      actionArea.innerHTML = `
+        <button id="close-button" class="btn btn-danger w-100">Close Pass</button>
+      `;
 
-      function renderCloseCard(passID) {
-        var card = document.getElementById('card-pass-action').querySelector('.card-body');
-        card.style.opacity = 0;
-        setTimeout(function() {
-          card.innerHTML =
-            '<button id="close-button" type="button" class="btn btn-primary">Close Pass</button>';
-          card.style.opacity = 1;
-          document.getElementById('close-button').onclick = function() {
-            var closeBtn = document.getElementById('close-button');
-            closeBtn.disabled = true;
-            showSpinner('close-button');
-            google.script.run
-              .withSuccessHandler(function(pass) {
-                hideSpinner('close-button');
-                updatePassState(null);
-                renderRequestForm();
-              })
-              .withFailureHandler(function(error) {
-                hideSpinner('close-button');
-                document.getElementById('close-button').disabled = false;
-                alert('Failed to close pass: ' + error.message);
-              })
-              .closePass(passID);
-          };
-        }, 300);
-      }
+      document.getElementById('close-button').addEventListener('click', () => {
+        const button = document.getElementById('close-button');
+        button.disabled = true;
+        showSpinner('close-button');
 
-      function showSpinner(buttonId) {
-        var button = document.getElementById(buttonId);
-        if (button) {
-          button.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span>Loading...';
-        }
-      }
+        google.script.run
+          .withSuccessHandler(() => {
+            hideSpinner('close-button');
+            updatePassState(null);
+          })
+          .withFailureHandler((err) => {
+            hideSpinner('close-button');
+            button.disabled = false;
+            showToast('Failed to close pass: ' + err.message, 'error');
+          })
+          .closePass(passID);
+      });
+    }
 
-      function hideSpinner(buttonId) {
-        var button = document.getElementById(buttonId);
-        if (button) {
-          if (buttonId === 'request-button') {
-            button.innerHTML = 'Request Pass';
-          } else if (buttonId === 'close-button') {
-            button.innerHTML = 'Close Pass';
-          }
-        }
-      }
+    function showLoading() {
+      document.getElementById('pass-state-text').innerHTML = `
+        <div class="spinner-border text-primary" role="status">
+          <span class="visually-hidden">Loading...</span>
+        </div>
+      `;
+    }
 
-      fetchPassState();
-      setInterval(fetchPassState, 30000);
-    </script>
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-  </body>
+    function hideLoading() {
+      // no-op for now (state text will update)
+    }
+
+    function updateLastUpdated() {
+      const now = new Date();
+      const timeStr = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      document.getElementById('last-updated').textContent = `Last updated: ${timeStr}`;
+    }
+
+    fetchPassState();
+    setInterval(fetchPassState, 30000);
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
 </html>
-<style>
-.footer {
-  margin-top: 2rem;
-  padding: 1rem 0;
-  text-align: center;
-  border-top: 1px solid #dee2e6;
-  color: #6c757d;
-}
-
-@media (max-width: 576px) {
-  .container-fluid {
-    padding-left: 1rem;
-    padding-right: 1rem;
-  }
-  
-  .card {
-    margin-bottom: 1rem;
-  }
-  
-  .btn {
-    width: 100%;
-    padding: 0.75rem;
-  }
-}
-</style>
