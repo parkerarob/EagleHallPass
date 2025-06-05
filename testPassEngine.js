@@ -123,13 +123,14 @@ function test_updatePassStatus_inToLocation() {
 
 function test_updatePassStatus_restroomInvalid() {
   const ids = _makeTestIds();
+  const ids2 = _makeTestIds();
   const passID = openPass(ids.student, ids.staffA, ids.dest2, 'restroom-rule');
-  const passID2 = openPass(ids.student, ids.staffA, ids.dest1, 'media-pass');
+  const passID2 = openPass(ids2.student, ids2.staffA, ids2.dest1, 'media-pass');
   try {
     const ok = assertThrows(() =>
         updatePassStatus(passID, 'IN', ids.dest2, ids.staffB, '', ''),
         'Restroom pass cannot be IN');
-    updatePassStatus(passID2, 'IN', ids.dest1, ids.staffB, '', '');
+    updatePassStatus(passID2, 'IN', ids2.dest1, ids2.staffB, '', '');
     const row = SpreadsheetApp.getActive()
       .getSheetByName('Active Passes')
       .getDataRange()
@@ -139,7 +140,7 @@ function test_updatePassStatus_restroomInvalid() {
     return ok && ok2;
   } finally {
     closePass(passID, ids.staffA, '', 'tearDown');
-    closePass(passID2, ids.staffA, '', 'tearDown');
+    closePass(passID2, ids2.staffA, '', 'tearDown');
     purgeLogs(passID);
     purgeLogs(passID2);
   }
